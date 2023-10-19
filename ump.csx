@@ -1,7 +1,22 @@
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text.Json;
 
 ThreadLocal<GlobalDecompileContext> DECOMPILE_CONTEXT = new ThreadLocal<GlobalDecompileContext>(() => new GlobalDecompileContext(Data, false));
+
+var scriptDir = Path.GetDirectoryName(ScriptPath);
+string config = File.ReadAllText(Path.Combine(scriptDir, "ump-config.json"));
+Dictionary<string, string> umpConfig = JsonSerializer.Deserialize<Dictionary<string, string>>(config);
+
+string modPath = umpConfig["mod-path"];
+
+string[] files = Directory.GetFiles(Path.Combine(scriptDir, modPath), "*.gml", SearchOption.AllDirectories);
+
+foreach (string file in files)
+{
+    UMPImportFile(file);
+}
+
 
 bool CheckIfCodeExists (string codeName)
 {
@@ -62,12 +77,13 @@ void UMPImportGML (string codeName, string code)
             {
                 throw new Exception("Unknown command type: " + command.GetType().Name);
             }
+            
+            if (patch.RequiresCompilation)
+            {
+                Data.Code.ByName(codeName).ReplaceGML(patch.Code, Data);
+            }
         }
 
-        if (patch.RequiresCompilation)
-        {
-            Data.Code.ByName(codeName).ReplaceGML(patch.Code, Data);
-        }
     }
     else
     {
