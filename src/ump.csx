@@ -151,7 +151,12 @@ void UMPImportGML (string codeName, string code)
             if (command is UMPAfterCommand)
             {
                 int placeIndex = patch.Code.IndexOf(command.OriginalCode) + command.OriginalCode.Length;
-                patch.Code = patch.Code.Insert(placeIndex, "\n" + command.NewCode);
+                patch.Code = patch.Code.Insert(placeIndex, "\n" + command.NewCode + "\n");
+            }
+            else if (command is UMPBeforeCommand)
+            {
+                int placeIndex = patch.Code.IndexOf(command.OriginalCode);
+                patch.Code = patch.Code.Insert(placeIndex, "\n" + command.NewCode + "\n");
             }
             else if (command is UMPReplaceCommand)
             {
@@ -236,6 +241,18 @@ abstract class UMPPatchCommand
 class UMPAfterCommand : UMPPatchCommand
 {
     public UMPAfterCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
+
+    public override bool BasedOnText => true;
+
+    public override bool RequiresCompilation => true;
+}
+
+/// <summary>
+/// Command that places some code before another
+/// </summary>
+class UMPBeforeCommand : UMPPatchCommand
+{
+    public UMPBeforeCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
 
     public override bool BasedOnText => true;
 
@@ -362,6 +379,10 @@ class UMPPatchFile
                     if (Regex.IsMatch(line, @"\bAFTER\b"))
                     {
                         currentCommand = typeof(UMPAfterCommand);
+                    }
+                    else if (Regex.IsMatch(line, @"\bBEFORE\b"))
+                    {
+                        currentCommand = typeof(UMPBeforeCommand);
                     }
                     else if (Regex.IsMatch(line, @"\bREPLACE\b"))
                     {
