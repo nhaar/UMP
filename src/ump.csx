@@ -172,7 +172,7 @@ void UMPImportGML (string codeName, string code)
             }
             else if (command is UMPPrependCommand)
             {
-                patch.Code = command.NewCode + patch.Code;
+                patch.Code = command.NewCode + "\n" + patch.Code;
             }
             else
             {
