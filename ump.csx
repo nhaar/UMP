@@ -3,12 +3,14 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using System.Linq;
 
+// used for decompiling
 ThreadLocal<GlobalDecompileContext> DECOMPILE_CONTEXT = new ThreadLocal<GlobalDecompileContext>(() => new GlobalDecompileContext(Data, false));
 
 var scriptDir = Path.GetDirectoryName(ScriptPath);
 string config = File.ReadAllText(Path.Combine(scriptDir, "ump-config.json"));
 Dictionary<string, string> umpConfig = JsonSerializer.Deserialize<Dictionary<string, string>>(config);
 
+// the path to all folders that will have the files that will be automatically read
 string modPath = umpConfig["mod-path"];
 
 string[] files = Directory.GetFiles(Path.Combine(scriptDir, modPath), "*.gml", SearchOption.AllDirectories);
@@ -20,6 +22,7 @@ List<string> notFunctionFiles = new();
 // first check: function separation and object creation
 foreach (string file in files)
 {
+    // extract name from event ending in number or with collision which can not end in a number
     string objName = Regex.Match(file, @"(?<=gml_Object_).*?((?=(_[a-zA-Z]+_\d+))|(?=_Collision))").Value;
     if (objName != "")
     {
@@ -52,7 +55,8 @@ foreach (string file in functionFiles)
 List<string> functionsInOrder = new();
 
 while (functionsInOrder.Count < functionCode.Count)
-{    
+{   
+    // go through each function, check if it's never mentiond in all functions that are already not in functionsInOrder 
     foreach (string testFunction in functionCode.Keys)
     {
         bool isSafe = true;
@@ -83,14 +87,23 @@ foreach (string file in notFunctionFiles)
     UMPImportFile(file);
 }
 
-
+/// <summary>
+/// Check if a code entry exists by its name
+/// </summary>
+/// <param name="codeName"></param>
+/// <returns></returns>
 bool CheckIfCodeExists (string codeName)
 {
     return Data.Code.ByName(codeName) != null;
 }
 
+/// <summary>
+/// Import a GML file into the game with its path, using the UMP format
+/// </summary>
+/// <param name="path"></param>
 void UMPImportFile (string path)
 {
+    // at the moment, exceptions here crash UTMT
     try
     {
         var fileName = Path.GetFileNameWithoutExtension(path);
@@ -104,6 +117,12 @@ void UMPImportFile (string path)
     }
 }
 
+/// <summary>
+/// Import a GML string to the code entry with its name, using the UMP format
+/// </summary>
+/// <param name="codeName"></param>
+/// <param name="code"></param>
+/// <exception cref="Exception"></exception>
 void UMPImportGML (string codeName, string code)
 {
     var isPatchFile = code.StartsWith("/// PATCH") && CheckIfCodeExists(codeName);
@@ -157,20 +176,40 @@ void UMPImportGML (string codeName, string code)
     }
 }
 
+/// <summary>
+/// Add the decompiled code of a code entry to a patch
+/// </summary>
+/// <param name="patch"></param>
+/// <param name="codeName"></param>
 void AddCodeToPatch (UmpPatchFile patch, string codeName)
 {
     if (Data.KnownSubFunctions is null) Decompiler.BuildSubFunctionCache(Data);
     patch.Code = Decompiler.Decompile(Data.Code.ByName(codeName), DECOMPILE_CONTEXT.Value);
 }
 
+/// <summary>
+/// Represents a command in a UMP patch file
+/// </summary>
 abstract class PatchCommand
 {
+    /// <summary>
+    /// Whether the command requires code from the original entry to be presented
+    /// </summary>
     public abstract bool BasedOnText { get; }
 
+    /// <summary>
+    /// Whether the command requires the code to be decompiled and then recompiled to create the changes
+    /// </summary>
     public abstract bool RequiresCompilation { get; }
 
+    /// <summary>
+    /// If is based on text, the original code required
+    /// </summary>
     public string OriginalCode { get; set; }
 
+    /// <summary>
+    /// The new code to be added
+    /// </summary>
     public string NewCode { get; set; }
 
     public PatchCommand (string newCode, string originalCode = null)
@@ -180,6 +219,9 @@ abstract class PatchCommand
     }
 }
 
+/// <summary>
+/// Command that places some code after another
+/// </summary>
 class AfterCommand : PatchCommand
 {
     public AfterCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
@@ -189,6 +231,9 @@ class AfterCommand : PatchCommand
     public override bool RequiresCompilation => true;
 }
 
+/// <summary>
+/// Command that replaces some code for another
+/// </summary>
 class ReplaceCommand : PatchCommand
 {
     public ReplaceCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
@@ -199,6 +244,9 @@ class ReplaceCommand : PatchCommand
 
 }
 
+/// <summary>
+/// Command that adds code to the end of a code entry
+/// </summary>
 class AppendCommand : PatchCommand
 {
     public AppendCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
@@ -208,6 +256,9 @@ class AppendCommand : PatchCommand
     public override bool RequiresCompilation => false;
 }
 
+/// <summary>
+/// Command that prepends code to the start of a code entry
+/// </summary>
 class PrependCommand : PatchCommand
 {
     public PrependCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
@@ -217,15 +268,29 @@ class PrependCommand : PatchCommand
     public override bool RequiresCompilation => true;
 }
 
-
+/// <summary>
+/// Represents a .gml file that has the `/// PATCH` syntax in it
+/// </summary>
 class UmpPatchFile
 {
+    /// <summary>
+    /// All commands in the patch
+    /// </summary>
     public List<PatchCommand> Commands = new();
 
+    /// <summary>
+    /// Whether any of the patches require the code to be decompiled and then recompiled to create the changes
+    /// </summary>
     public bool RequiresCompilation { get; }
 
+    /// <summary>
+    /// Code of the code entry that is being updated, expected to always be up to date with patch changes
+    /// </summary>
     public string Code { get; set ; }
 
+    /// <summary>
+    /// Exception thrown when a command is not recognized
+    /// </summary>
     public class ModifiedCommandException : Exception
     {
         public ModifiedCommandException(string line) : base("Unknown command in modified code: " + line) { }
@@ -320,11 +385,21 @@ class UmpPatchFile
     }
 }
 
+/// <summary>
+/// Append GML to the end of a code entry
+/// </summary>
+/// <param name="codeName"></param>
+/// <param name="code"></param>
 void AppendGML (string codeName, string code)
 {
     Data.Code.ByName(codeName).AppendGML(code, Data);
 }
 
+/// <summary>
+/// Create a game object with the given name
+/// </summary>
+/// <param name="objectName"></param>
+/// <returns></returns>
 UndertaleGameObject CreateGMSObject (string objectName)
 {
     var obj = new UndertaleGameObject();
