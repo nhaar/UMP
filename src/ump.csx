@@ -3,10 +3,10 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using System.Linq;
 
-UMPMain();
-
 // used for decompiling
 ThreadLocal<GlobalDecompileContext> UMP_DECOMPILE_CONTEXT = new ThreadLocal<GlobalDecompileContext>(() => new GlobalDecompileContext(Data, false));
+
+UMPMain();
 
 /// <summary>
 /// The main function of the script
