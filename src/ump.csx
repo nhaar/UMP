@@ -402,7 +402,7 @@ class UMPPatchFile
 /// <param name="code"></param>
 void UMPAppendGML (string codeName, string code)
 {
-    Data.Code.ByName(codeName).UMPAppendGML(code, Data);
+    Data.Code.ByName(codeName).AppendGML(code, Data);
 }
 
 /// <summary>
