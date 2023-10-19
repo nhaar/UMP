@@ -67,6 +67,7 @@ void UMPMain ()
         // go through each function, check if it's never mentiond in all functions that are already not in functionsInOrder 
         foreach (string testFunction in functionCode.Keys)
         {
+            if (functionsInOrder.Contains(testFunction)) continue;
             bool isSafe = true;
             foreach (string otherFunction in functionCode.Keys)
             {
