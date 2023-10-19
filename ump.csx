@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using System.Text.Json;
+using System.Linq;
 
 ThreadLocal<GlobalDecompileContext> DECOMPILE_CONTEXT = new ThreadLocal<GlobalDecompileContext>(() => new GlobalDecompileContext(Data, false));
 
@@ -12,7 +13,72 @@ string modPath = umpConfig["mod-path"];
 
 string[] files = Directory.GetFiles(Path.Combine(scriptDir, modPath), "*.gml", SearchOption.AllDirectories);
 
+List<string> functionFiles = new();
+
+List<string> notFunctionFiles = new();
+
+// first check: function separation and object creation
 foreach (string file in files)
+{
+    string objName = Regex.Match(file, @"(?<=gml_Object_).*?((?=(_[a-zA-Z]+_\d+))|(?=_Collision))").Value;
+    if (objName != "")
+    {
+        if (Data.GameObjects.ByName(objName) == null)
+        {
+            CreateGMSObject(objName);
+        }
+    }
+    if (file.Contains("gml_GlobalScript") || file.Contains("gml_Script"))
+    {
+        functionFiles.Add(file);
+    }
+    else
+    {
+        notFunctionFiles.Add(file);
+    }
+}
+
+Dictionary<string, string> functionCode = new();
+Dictionary<string, string> functionNames = new();
+foreach (string file in functionFiles)
+{
+    string code = File.ReadAllText(file);
+    string functionName = Regex.Match(file, @"(?<=(gml_Script_|gml_GlobalScript_)).*?(?=\.gml)").Value;
+    functionCode[file] = code;
+    functionNames[file] = functionName;
+}
+
+// order functions so that they never call functions not yet defined
+List<string> functionsInOrder = new();
+
+while (functionsInOrder.Count < functionCode.Count)
+{    
+    foreach (string testFunction in functionCode.Keys)
+    {
+        bool isSafe = true;
+        foreach (string otherFunction in functionCode.Keys)
+        {
+            if (!functionsInOrder.Contains(otherFunction) && otherFunction != testFunction)
+            {
+                if (Regex.IsMatch(functionCode[testFunction], @$"\b{functionNames[otherFunction]}\b"))
+                {
+                    isSafe = false;
+                    break;
+                }
+            }
+        }
+        if (isSafe)
+        {
+            functionsInOrder.Add(testFunction);
+        }
+    }
+}
+
+foreach (string file in functionsInOrder)
+{
+    UMPImportFile(file);
+}
+foreach (string file in notFunctionFiles)
 {
     UMPImportFile(file);
 }
@@ -257,4 +323,13 @@ class UmpPatchFile
 void AppendGML (string codeName, string code)
 {
     Data.Code.ByName(codeName).AppendGML(code, Data);
+}
+
+UndertaleGameObject CreateGMSObject (string objectName)
+{
+    var obj = new UndertaleGameObject();
+    obj.Name = Data.Strings.MakeString(objectName);
+    Data.GameObjects.Add(obj);
+
+    return obj;
 }
