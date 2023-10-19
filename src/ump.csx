@@ -5,13 +5,14 @@ using System.Linq;
 
 UMPMain();
 
+// used for decompiling
+ThreadLocal<GlobalDecompileContext> UMP_DECOMPILE_CONTEXT = new ThreadLocal<GlobalDecompileContext>(() => new GlobalDecompileContext(Data, false));
+
 /// <summary>
 /// The main function of the script
 /// </summary>
 void UMPMain ()
 {
-    // used for decompiling
-    ThreadLocal<GlobalDecompileContext> DECOMPILE_CONTEXT = new ThreadLocal<GlobalDecompileContext>(() => new GlobalDecompileContext(Data, false));
 
     var scriptDir = Path.GetDirectoryName(ScriptPath);
     string config = File.ReadAllText(Path.Combine(scriptDir, "ump-config.json"));
@@ -193,7 +194,7 @@ void UMPImportGML (string codeName, string code)
 void UMPAddCodeToPatch (UMPPatchFile patch, string codeName)
 {
     if (Data.KnownSubFunctions is null) Decompiler.BuildSubFunctionCache(Data);
-    patch.Code = Decompiler.Decompile(Data.Code.ByName(codeName), DECOMPILE_CONTEXT.Value);
+    patch.Code = Decompiler.Decompile(Data.Code.ByName(codeName), UMP_DECOMPILE_CONTEXT.Value);
 }
 
 /// <summary>
