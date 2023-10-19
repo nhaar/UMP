@@ -3,96 +3,105 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using System.Linq;
 
-// used for decompiling
-ThreadLocal<GlobalDecompileContext> DECOMPILE_CONTEXT = new ThreadLocal<GlobalDecompileContext>(() => new GlobalDecompileContext(Data, false));
+UMPMain();
 
-var scriptDir = Path.GetDirectoryName(ScriptPath);
-string config = File.ReadAllText(Path.Combine(scriptDir, "ump-config.json"));
-Dictionary<string, string> umpConfig = JsonSerializer.Deserialize<Dictionary<string, string>>(config);
-
-// the path to all folders that will have the files that will be automatically read
-string modPath = umpConfig["mod-path"];
-
-string[] files = Directory.GetFiles(Path.Combine(scriptDir, modPath), "*.gml", SearchOption.AllDirectories);
-
-List<string> functionFiles = new();
-
-List<string> notFunctionFiles = new();
-
-// first check: function separation and object creation
-foreach (string file in files)
+/// <summary>
+/// The main function of the script
+/// </summary>
+void UMPMain ()
 {
-    // extract name from event ending in number or with collision which can not end in a number
-    string objName = Regex.Match(file, @"(?<=gml_Object_).*?((?=(_[a-zA-Z]+_\d+))|(?=_Collision))").Value;
-    if (objName != "")
+    // used for decompiling
+    ThreadLocal<GlobalDecompileContext> DECOMPILE_CONTEXT = new ThreadLocal<GlobalDecompileContext>(() => new GlobalDecompileContext(Data, false));
+
+    var scriptDir = Path.GetDirectoryName(ScriptPath);
+    string config = File.ReadAllText(Path.Combine(scriptDir, "ump-config.json"));
+    Dictionary<string, string> umpConfig = JsonSerializer.Deserialize<Dictionary<string, string>>(config);
+
+    // the path to all folders that will have the files that will be automatically read
+    string modPath = umpConfig["mod-path"];
+
+    string[] files = Directory.GetFiles(Path.Combine(scriptDir, modPath), "*.gml", SearchOption.AllDirectories);
+
+    List<string> functionFiles = new();
+
+    List<string> notFunctionFiles = new();
+
+    // first check: function separation and object creation
+    foreach (string file in files)
     {
-        if (Data.GameObjects.ByName(objName) == null)
+        // extract name from event ending in number or with collision which can not end in a number
+        string objName = Regex.Match(file, @"(?<=gml_Object_).*?((?=(_[a-zA-Z]+_\d+))|(?=_Collision))").Value;
+        if (objName != "")
         {
-            CreateGMSObject(objName);
-        }
-    }
-    if (file.Contains("gml_GlobalScript") || file.Contains("gml_Script"))
-    {
-        functionFiles.Add(file);
-    }
-    else
-    {
-        notFunctionFiles.Add(file);
-    }
-}
-
-Dictionary<string, string> functionCode = new();
-Dictionary<string, string> functionNames = new();
-foreach (string file in functionFiles)
-{
-    string code = File.ReadAllText(file);
-    string functionName = Regex.Match(file, @"(?<=(gml_Script_|gml_GlobalScript_)).*?(?=\.gml)").Value;
-    functionCode[file] = code;
-    functionNames[file] = functionName;
-}
-
-// order functions so that they never call functions not yet defined
-List<string> functionsInOrder = new();
-
-while (functionsInOrder.Count < functionCode.Count)
-{   
-    // go through each function, check if it's never mentiond in all functions that are already not in functionsInOrder 
-    foreach (string testFunction in functionCode.Keys)
-    {
-        bool isSafe = true;
-        foreach (string otherFunction in functionCode.Keys)
-        {
-            if (!functionsInOrder.Contains(otherFunction) && otherFunction != testFunction)
+            if (Data.GameObjects.ByName(objName) == null)
             {
-                if (Regex.IsMatch(functionCode[testFunction], @$"\b{functionNames[otherFunction]}\b"))
-                {
-                    isSafe = false;
-                    break;
-                }
+                UMPCreateGMSObject(objName);
             }
         }
-        if (isSafe)
+        if (file.Contains("gml_GlobalScript") || file.Contains("gml_Script"))
         {
-            functionsInOrder.Add(testFunction);
+            functionFiles.Add(file);
         }
+        else
+        {
+            notFunctionFiles.Add(file);
+        }
+    }
+
+    Dictionary<string, string> functionCode = new();
+    Dictionary<string, string> functionNames = new();
+    foreach (string file in functionFiles)
+    {
+        string code = File.ReadAllText(file);
+        string functionName = Regex.Match(file, @"(?<=(gml_Script_|gml_GlobalScript_)).*?(?=\.gml)").Value;
+        functionCode[file] = code;
+        functionNames[file] = functionName;
+    }
+
+    // order functions so that they never call functions not yet defined
+    List<string> functionsInOrder = new();
+
+    while (functionsInOrder.Count < functionCode.Count)
+    {   
+        // go through each function, check if it's never mentiond in all functions that are already not in functionsInOrder 
+        foreach (string testFunction in functionCode.Keys)
+        {
+            bool isSafe = true;
+            foreach (string otherFunction in functionCode.Keys)
+            {
+                if (!functionsInOrder.Contains(otherFunction) && otherFunction != testFunction)
+                {
+                    if (Regex.IsMatch(functionCode[testFunction], @$"\b{functionNames[otherFunction]}\b"))
+                    {
+                        isSafe = false;
+                        break;
+                    }
+                }
+            }
+            if (isSafe)
+            {
+                functionsInOrder.Add(testFunction);
+            }
+        }
+    }
+
+    foreach (string file in functionsInOrder)
+    {
+        UMPImportFile(file);
+    }
+    foreach (string file in notFunctionFiles)
+    {
+        UMPImportFile(file);
     }
 }
 
-foreach (string file in functionsInOrder)
-{
-    UMPImportFile(file);
-}
-foreach (string file in notFunctionFiles)
-{
-    UMPImportFile(file);
-}
 
 /// <summary>
 /// Check if a code entry exists by its name
 /// </summary>
 /// <param name="codeName"></param>
 /// <returns></returns>
-bool CheckIfCodeExists (string codeName)
+bool UMPCheckIfCodeExists (string codeName)
 {
     return Data.Code.ByName(codeName) != null;
 }
@@ -125,36 +134,36 @@ void UMPImportFile (string path)
 /// <exception cref="Exception"></exception>
 void UMPImportGML (string codeName, string code)
 {
-    var isPatchFile = code.StartsWith("/// PATCH") && CheckIfCodeExists(codeName);
+    var isPatchFile = code.StartsWith("/// PATCH") && UMPCheckIfCodeExists(codeName);
 
     if (isPatchFile)
     {
-        UmpPatchFile patch = new UmpPatchFile(code);
+        UMPPatchFile patch = new UMPPatchFile(code);
         if (patch.RequiresCompilation)
         {
-            AddCodeToPatch(patch, codeName);
+            UMPAddCodeToPatch(patch, codeName);
         }
 
-        foreach (PatchCommand command in patch.Commands)
+        foreach (UMPPatchCommand command in patch.Commands)
         {
-            if (command is AfterCommand)
+            if (command is UMPAfterCommand)
             {
                 int placeIndex = patch.Code.IndexOf(command.OriginalCode) + command.OriginalCode.Length;
                 patch.Code = patch.Code.Insert(placeIndex, "\n" + command.NewCode);
             }
-            else if (command is ReplaceCommand)
+            else if (command is UMPReplaceCommand)
             {
                 patch.Code = patch.Code.Replace(command.OriginalCode, command.NewCode);
             }
-            else if (command is AppendCommand)
+            else if (command is UMPAppendCommand)
             {
-                AppendGML(codeName, command.NewCode);
+                UMPAppendGML(codeName, command.NewCode);
                 if (patch.RequiresCompilation)
                 {
-                    AddCodeToPatch(patch, codeName);
+                    UMPAddCodeToPatch(patch, codeName);
                 }
             }
-            else if (command is PrependCommand)
+            else if (command is UMPPrependCommand)
             {
                 patch.Code = command.NewCode + patch.Code;
             }
@@ -181,7 +190,7 @@ void UMPImportGML (string codeName, string code)
 /// </summary>
 /// <param name="patch"></param>
 /// <param name="codeName"></param>
-void AddCodeToPatch (UmpPatchFile patch, string codeName)
+void UMPAddCodeToPatch (UMPPatchFile patch, string codeName)
 {
     if (Data.KnownSubFunctions is null) Decompiler.BuildSubFunctionCache(Data);
     patch.Code = Decompiler.Decompile(Data.Code.ByName(codeName), DECOMPILE_CONTEXT.Value);
@@ -190,7 +199,7 @@ void AddCodeToPatch (UmpPatchFile patch, string codeName)
 /// <summary>
 /// Represents a command in a UMP patch file
 /// </summary>
-abstract class PatchCommand
+abstract class UMPPatchCommand
 {
     /// <summary>
     /// Whether the command requires code from the original entry to be presented
@@ -212,7 +221,7 @@ abstract class PatchCommand
     /// </summary>
     public string NewCode { get; set; }
 
-    public PatchCommand (string newCode, string originalCode = null)
+    public UMPPatchCommand (string newCode, string originalCode = null)
     {
         NewCode = newCode;
         OriginalCode = originalCode;
@@ -222,9 +231,9 @@ abstract class PatchCommand
 /// <summary>
 /// Command that places some code after another
 /// </summary>
-class AfterCommand : PatchCommand
+class UMPAfterCommand : UMPPatchCommand
 {
-    public AfterCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
+    public UMPAfterCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
 
     public override bool BasedOnText => true;
 
@@ -234,9 +243,9 @@ class AfterCommand : PatchCommand
 /// <summary>
 /// Command that replaces some code for another
 /// </summary>
-class ReplaceCommand : PatchCommand
+class UMPReplaceCommand : UMPPatchCommand
 {
-    public ReplaceCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
+    public UMPReplaceCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
 
     public override bool BasedOnText => true;
 
@@ -247,9 +256,9 @@ class ReplaceCommand : PatchCommand
 /// <summary>
 /// Command that adds code to the end of a code entry
 /// </summary>
-class AppendCommand : PatchCommand
+class UMPAppendCommand : UMPPatchCommand
 {
-    public AppendCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
+    public UMPAppendCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
 
     public override bool BasedOnText => false;
 
@@ -259,9 +268,9 @@ class AppendCommand : PatchCommand
 /// <summary>
 /// Command that prepends code to the start of a code entry
 /// </summary>
-class PrependCommand : PatchCommand
+class UMPPrependCommand : UMPPatchCommand
 {
-    public PrependCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
+    public UMPPrependCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
 
     public override bool BasedOnText => false;
 
@@ -271,12 +280,12 @@ class PrependCommand : PatchCommand
 /// <summary>
 /// Represents a .gml file that has the `/// PATCH` syntax in it
 /// </summary>
-class UmpPatchFile
+class UMPPatchFile
 {
     /// <summary>
     /// All commands in the patch
     /// </summary>
-    public List<PatchCommand> Commands = new();
+    public List<UMPPatchCommand> Commands = new();
 
     /// <summary>
     /// Whether any of the patches require the code to be decompiled and then recompiled to create the changes
@@ -296,7 +305,7 @@ class UmpPatchFile
         public ModifiedCommandException(string line) : base("Unknown command in modified code: " + line) { }
     }
 
-    public UmpPatchFile (string gmlCode)
+    public UMPPatchFile (string gmlCode)
     {
         gmlCode = gmlCode.Substring(gmlCode.IndexOf('\n') + 1);
         string[] patchLines = gmlCode.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None);
@@ -322,7 +331,7 @@ class UmpPatchFile
                         string originalCodeString = string.Join("\n", originalCode);
                         string newCodeString = string.Join("\n", newCode);
                         object command = Activator.CreateInstance(currentCommand, args: new object[] { newCodeString, originalCodeString });                                                        
-                        Commands.Add((PatchCommand)command);
+                        Commands.Add((UMPPatchCommand)command);
                         currentCommand = null;
                         newCode = new List<string>();
                         originalCode = new List<string>();
@@ -350,21 +359,21 @@ class UmpPatchFile
                 {
                     if (Regex.IsMatch(line, @"\bAFTER\b"))
                     {
-                        currentCommand = typeof(AfterCommand);
+                        currentCommand = typeof(UMPAfterCommand);
                     }
                     else if (Regex.IsMatch(line, @"\bREPLACE\b"))
                     {
-                        currentCommand = typeof(ReplaceCommand);
+                        currentCommand = typeof(UMPReplaceCommand);
                     }
                     else if (Regex.IsMatch(line, @"\bAPPEND\b"))
                     {
                         inOriginalText = false;
-                        currentCommand = typeof(AppendCommand);
+                        currentCommand = typeof(UMPAppendCommand);
                     }
                     else if (Regex.IsMatch(line, @"\bPREPEND\b"))
                     {
                         inOriginalText = false;
-                        currentCommand = typeof(PrependCommand);
+                        currentCommand = typeof(UMPPrependCommand);
                     }
                     else
                     {
@@ -374,7 +383,7 @@ class UmpPatchFile
             }
         }
 
-        foreach (PatchCommand command in Commands)
+        foreach (UMPPatchCommand command in Commands)
         {
             if (command.RequiresCompilation)
             {
@@ -390,9 +399,9 @@ class UmpPatchFile
 /// </summary>
 /// <param name="codeName"></param>
 /// <param name="code"></param>
-void AppendGML (string codeName, string code)
+void UMPAppendGML (string codeName, string code)
 {
-    Data.Code.ByName(codeName).AppendGML(code, Data);
+    Data.Code.ByName(codeName).UMPAppendGML(code, Data);
 }
 
 /// <summary>
@@ -400,7 +409,7 @@ void AppendGML (string codeName, string code)
 /// </summary>
 /// <param name="objectName"></param>
 /// <returns></returns>
-UndertaleGameObject CreateGMSObject (string objectName)
+UndertaleGameObject UMPCreateGMSObject (string objectName)
 {
     var obj = new UndertaleGameObject();
     obj.Name = Data.Strings.MakeString(objectName);
