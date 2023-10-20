@@ -15,11 +15,11 @@ The files inside the folder can be in any subdirectory, as long as they end in `
 
 # Properly naming the files
 
-In vanilla Undertale Mod Tool, if you can manipulate new object code directly by just using proper name for the files. For example, if you have an object called `obj_object`, and you want to add a create event listener, you can simply leave a file named `gml_Object_obj_object_Create_0.gml` inside the mod folder. The number at the end is required and can be used to have different events. So, for objects, you just need to name the file in the format `gml_Object_OBJECT_NAME_EVENT_NAME_EVENTNUMBER`.
+In vanilla Undertale Mod Tool, you can create new object code directly by just using proper name for the files. For example, if you have an object called `obj_object`, and you want to add a create event listener, you can simply leave a file named `gml_Object_obj_object_Create_0.gml` inside the mod folder. The number at the end is required and can be used to have different events. So, for objects, you just need to name the file in the format `gml_Object_OBJECT_NAME_EVENT_NAME_EVENTNUMBER`.
 
 In the framework, if you use an object that doesn't exist, the object will be automatically created.
 
-For functions, you can name the file in the pattern `gml_GlobalScript_FUNCTION_NAME`, and for GMS 2.3, you may use the `function ()` syntax to define them.
+For functions, you can name the file in the pattern `gml_GlobalScript_FUNCTION_NAME`, and for GMS 2.3 and above, you may use the `function ()` syntax to define them.
 
 # Patch files
 
