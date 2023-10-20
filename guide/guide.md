@@ -141,9 +141,9 @@ this_is_a_prepend = 0
 The final code:
 
 ```gml
-this_is_an_append = 0
-foo = bar
 this_is_a_prepend = 0
+foo = bar
+this_is_an_append = 0
 ```
 
 ## Replace command
