@@ -1,6 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
-using System.Text.Json;
+using Newtonsoft.Json;
 using System.Linq;
 
 // used for decompiling
@@ -26,26 +26,31 @@ void UMPMain ()
 
     var scriptDir = Path.GetDirectoryName(ScriptPath);
     string config = File.ReadAllText(Path.Combine(scriptDir, "ump-config.json"));
-    Dictionary<string, string> umpConfig = JsonSerializer.Deserialize<Dictionary<string, string>>(config);
+    Dictionary<string, object> umpConfig = JsonConvert.DeserializeObject<Dictionary<string, object>>(config);
 
     // the path to all folders that will have the files that will be automatically read
-    string modPath = umpConfig["mod-path"];
+    string modPath = (string)umpConfig["mod-path"];
+
+    List<string> objectPrefixes = new();
+    try
+    {
+        objectPrefixes = ((Newtonsoft.Json.Linq.JArray)umpConfig["object-prefixes"]).ToObject<List<string>>();
+    }
+    catch (System.Exception)
+    {        
+    }
 
     string[] files = Directory.GetFiles(Path.Combine(scriptDir, modPath), "*.gml", SearchOption.AllDirectories);
 
-    List<string> functionFiles = new();
-
-    List<string> notFunctionFiles = new();
-
     List<UMPFunctionEntry> functions = new();
+    List<UMPCodeEntry> nonFunctions = new();
     Dictionary<string, string> functionNames = new();
 
     // first check: function separation and object creation
     foreach (string file in files)
     {
-        // ignoring files
-        // TO-DO: code being read twice? possible optimization if needed
         string code = File.ReadAllText(file);
+        // ignoring files
         if (code.StartsWith("/// IGNORE"))
             continue;
         // "opening" function files
@@ -144,7 +149,16 @@ void UMPMain ()
         }
         else
         {
-            notFunctionFiles.Add(file);
+            string entryName = Path.GetFileNameWithoutExtension(file);
+            foreach (string prefix in objectPrefixes)
+            {
+                if (entryName.StartsWith(prefix))
+                {
+                    entryName = $"gml_Object_{entryName}";
+                    break;
+                }
+            }
+            nonFunctions.Add(new UMPCodeEntry(entryName, code));
         }
     }
 
@@ -188,9 +202,9 @@ void UMPMain ()
     {
         UMPImportGML(functionEntry.Name, functionEntry.Code);
     }
-    foreach (string file in notFunctionFiles)
+    foreach (UMPCodeEntry entry in nonFunctions)
     {
-        UMPImportFile(file);
+        UMPImportGML(entry.Name, entry.Code);
     }
 }
 
