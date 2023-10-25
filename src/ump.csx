@@ -136,15 +136,6 @@ void UMPMain ()
             continue;
         }
 
-        // extract name from event ending in number or with collision which can not end in a number
-        string objName = Regex.Match(file, @"(?<=gml_Object_).*?((?=(_[a-zA-Z]+_\d+))|(?=_Collision))").Value;
-        if (objName != "")
-        {
-            if (Data.GameObjects.ByName(objName) == null)
-            {
-                UMPCreateGMSObject(objName);
-            }
-        }
         if (file.Contains("gml_GlobalScript") || file.Contains("gml_Script"))
         {
             string entryName = Path.GetFileNameWithoutExtension(file);
@@ -164,6 +155,21 @@ void UMPMain ()
                 }
             }
             nonFunctions.Add(new UMPCodeEntry(entryName, code));
+        }
+    }
+
+
+    // creating new objects
+    foreach (UMPCodeEntry entry in nonFunctions)
+    {
+        // extract name from event ending in number or with collision which can not end in a number
+        string objName = Regex.Match(entry.Name, @"(?<=gml_Object_).*?((?=(_[a-zA-Z]+_\d+))|(?=_Collision))").Value;
+        if (objName != "")
+        {
+            if (Data.GameObjects.ByName(objName) == null)
+            {
+                UMPCreateGMSObject(objName);
+            }
         }
     }
 
