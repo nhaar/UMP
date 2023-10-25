@@ -82,7 +82,9 @@ void UMPMain ()
                             bool endLoop = code[i] == ')';
                             if (code[i] == ',' || endLoop)
                             {
-                                args.Add(code.Substring(nameStart, i - nameStart).Trim());
+                                string argName = code.Substring(nameStart, i - nameStart).Trim();
+                                if (argName != "")
+                                    args.Add(argName);
                                 nameStart = i + 1;
                                 if (endLoop)
                                     break;
