@@ -112,19 +112,23 @@ void UMPMain ()
                         // - 1 at the end to remove the last }
                         string functionCodeBlock = code.Substring(codeStart, i - codeStart - 1);
 
+                        
+                        List<string> gmlArgs = new();
                         // initializing args, unless they are argumentN in gamemaker because those already work normally
-                        foreach (string arg in args)
+                        for (int j = 0; j < args.Count; j++)
                         {
+                            gmlArgs.Add("argument" + j);
+                            string arg = args[j];
                             if (arg.StartsWith("argument"))
                             {
                                 continue;
                             }
                             else
                             {
-                                functionCodeBlock = $"var {arg} = argument{args.IndexOf(arg) + 1};" + functionCodeBlock;
+                                functionCodeBlock = $"var {arg} = argument{j};" + functionCodeBlock;
                             }
                         }
-                        functionCodeBlock = $"function {functionName}() {{ {functionCodeBlock} }}";
+                        functionCodeBlock = $"function {functionName}({string.Join(", ", gmlArgs)}) {{ {functionCodeBlock} }}";
                         string entryName = $"gml_GlobalScript_{functionName}";
                         functions.Add(new UMPFunctionEntry(entryName, functionCodeBlock, functionName));
                     }
