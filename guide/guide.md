@@ -21,6 +21,18 @@ In the framework, if you use an object that doesn't exist, the object will be au
 
 For functions, you can name the file in the pattern `gml_GlobalScript_FUNCTION_NAME`, and for GMS 2.3, you may use the `function ()` syntax to define them.
 
+## Shorthand for object prefixes
+
+If you're not very happy with having to write `gml_Object` in every file name, then you can define object prefixes in your configuration file. Inside `ump-config`, you can add the key `object-prefixes`, which should have as the value a JSON array containing all the allowed prefixes for an object. If a file begins with any of the given prefixes, it will be considered an object file. Here's how it should look like:
+
+```json
+{
+    "object-prefixes": ["obj_", "o_"]
+}
+```
+
+Now, all files inside the mods directory beginning with either `obj_` or `o_` will automatically be treated as objects.
+
 # Patch files
 
 The framework introduces a shorthand syntax for patching code files. First, you declare a `.gml` file as being a patch by including in the first line (capitalization is needed for all these):
