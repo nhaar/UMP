@@ -16,6 +16,8 @@ existing objects and scripts, which is already an UTMT feature, but also:
 
 * Add simple and short syntax for using patch files, as to have files that only change parts of the code, making them clean and more resistant to version changes
 
+* Allow defining multiple functions in one file
+
 * Extra useful API that can be used inside the `.csx` scripts
 
 The framework is meant to be used alongside a base `.csx` script, or if you do not wish to use any custom scripting code, you can use it directly.
