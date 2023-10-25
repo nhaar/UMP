@@ -178,6 +178,10 @@ middle_line = "this is changed now"
 line3 = 3
 ```
 
+# Ignoring Files
+
+If you want to include `.gml` files in the mod folder and not manually add them, you can add `/// IGNORE` to their first line.
+
 # Mod API
 
 Aditionally, if you are loading the mod inside another `.csx` script, you can use the API given by the mod, which consists of some functions and variables, some more useful than others, listed below

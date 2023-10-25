@@ -30,6 +30,12 @@ void UMPMain ()
     // first check: function separation and object creation
     foreach (string file in files)
     {
+        // ignoring files
+        // TO-DO: code being read twice? possible optimization if needed
+        string code = File.ReadAllText(file);
+        if (code.StartsWith("/// IGNORE"))
+            continue;
+
         // extract name from event ending in number or with collision which can not end in a number
         string objName = Regex.Match(file, @"(?<=gml_Object_).*?((?=(_[a-zA-Z]+_\d+))|(?=_Collision))").Value;
         if (objName != "")
