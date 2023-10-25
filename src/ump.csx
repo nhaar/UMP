@@ -37,7 +37,7 @@ void UMPMain ()
 
     List<string> notFunctionFiles = new();
 
-    Dictionary<string, string> functionCode = new();
+    List<UMPFunctionEntry> functions = new();
     Dictionary<string, string> functionNames = new();
 
     // first check: function separation and object creation
@@ -119,9 +119,7 @@ void UMPMain ()
                         }
                         functionCodeBlock = $"function {functionName}() {{ {functionCodeBlock} }}";
                         string entryName = $"gml_GlobalScript_{functionName}";
-                        Console.WriteLine(functionName);
-                        functionCode[entryName] = functionCodeBlock;
-                        functionNames[entryName] = functionName;
+                        functions.Add(new UMPFunctionEntry(entryName, functionCodeBlock, functionName));
                     }
                 }
                 i++;
@@ -152,30 +150,27 @@ void UMPMain ()
 
     foreach (string file in functionFiles)
     {
-        // this is for the automatically added from /// FUNCTIONS type files
-        if (functionCode.ContainsKey(file)) continue;
-
         string code = File.ReadAllText(file);
-        string functionName = Regex.Match(file, @"(?<=(gml_Script_|gml_GlobalScript_)).*?(?=\.gml)").Value;
-        functionCode[file] = code;
-        functionNames[file] = functionName;
+        string entryName = Path.GetFileNameWithoutExtension(file);
+        string functionName = Regex.Match(entryName, @"(?<=(gml_Script_|gml_GlobalScript_))[_\d\w]+").Value;
+        functions.Add(new UMPFunctionEntry(entryName, code, functionName));
     }
 
     // order functions so that they never call functions not yet defined
-    List<string> functionsInOrder = new();
+    List<UMPFunctionEntry> functionsInOrder = new();
 
-    while (functionsInOrder.Count < functionCode.Count)
+    while (functionsInOrder.Count < functions.Count)
     {   
         // go through each function, check if it's never mentiond in all functions that are already not in functionsInOrder 
-        foreach (string testFunction in functionCode.Keys)
+        foreach (UMPFunctionEntry testFunction in functions)
         {
             if (functionsInOrder.Contains(testFunction)) continue;
             bool isSafe = true;
-            foreach (string otherFunction in functionCode.Keys)
+            foreach (UMPFunctionEntry otherFunction in functions)
             {
-                if (!functionsInOrder.Contains(otherFunction) && otherFunction != testFunction)
+                if (!functionsInOrder.Contains(otherFunction) && !otherFunction.Equals(testFunction))
                 {
-                    if (Regex.IsMatch(functionCode[testFunction], @$"\b{functionNames[otherFunction]}\b"))
+                    if (Regex.IsMatch(testFunction.Code, @$"\b{otherFunction.FunctionName}\b"))
                     {
                         isSafe = false;
                         break;
@@ -189,9 +184,9 @@ void UMPMain ()
         }
     }
 
-    foreach (string file in functionsInOrder)
+    foreach (UMPFunctionEntry functionEntry in functionsInOrder)
     {
-        UMPImportGML(file.Replace(".gml", ""), functionCode[file]);
+        UMPImportGML(functionEntry.Name, functionEntry.Code);
     }
     foreach (string file in notFunctionFiles)
     {
@@ -533,4 +528,51 @@ UndertaleGameObject UMPCreateGMSObject (string objectName)
     Data.GameObjects.Add(obj);
 
     return obj;
+}
+
+/// <summary>
+/// Represents a code entry that will be added
+/// </summary>
+class UMPCodeEntry
+{
+    public string Name { get; set; }
+    public string Code { get; set; }
+
+    public UMPCodeEntry (string name, string code)
+    {
+        Name = name;
+        Code = code;
+    }
+
+    public override bool Equals(object obj)
+    {        
+        if (obj == null || GetType() != obj.GetType())
+        {
+            return false;
+        }
+        
+        UMPCodeEntry other = (UMPCodeEntry)obj;
+        return Name == other.Name && Code == other.Code;
+    }
+    
+    // override object.GetHashCode
+    public override int GetHashCode()
+    {
+        // TODO: write your implementation of GetHashCode() here
+        throw new System.NotImplementedException();
+        return base.GetHashCode();
+    }
+}
+
+/// <summary>
+/// Represents a code entry that is a function
+/// </summary>
+class UMPFunctionEntry : UMPCodeEntry
+{
+    public string FunctionName { get; set; }
+
+    public UMPFunctionEntry (string name, string code, string functionName) : base(name, code)
+    {
+        FunctionName = functionName;
+    }
 }
