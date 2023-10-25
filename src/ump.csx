@@ -6,7 +6,17 @@ using System.Linq;
 // used for decompiling
 ThreadLocal<GlobalDecompileContext> UMP_DECOMPILE_CONTEXT = new ThreadLocal<GlobalDecompileContext>(() => new GlobalDecompileContext(Data, false));
 
-UMPMain();
+// exceptions need to be logged if the file is being loaded, otherwise UTMT crashes
+try
+{
+    UMPMain();
+}
+catch (Exception e)
+{
+    Console.WriteLine("UMP related exception! There may be an issue with your files.");
+    Console.WriteLine(e.Message);
+    Console.WriteLine(e.StackTrace);
+}
 
 /// <summary>
 /// The main function of the script
@@ -207,17 +217,9 @@ bool UMPCheckIfCodeExists (string codeName)
 void UMPImportFile (string path)
 {
     // at the moment, exceptions here crash UTMT
-    try
-    {
-        var fileName = Path.GetFileNameWithoutExtension(path);
-        var code = File.ReadAllText(path);
-        UMPImportGML(fileName, code);
-    }
-    catch (System.Exception e)
-    {
-        Console.WriteLine(e.Message);
-        Console.WriteLine(e.StackTrace);
-    }
+    var fileName = Path.GetFileNameWithoutExtension(path);
+    var code = File.ReadAllText(path);
+    UMPImportGML(fileName, code);
 }
 
 /// <summary>
