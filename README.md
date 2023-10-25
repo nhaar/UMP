@@ -1,7 +1,6 @@
 # Warning!
 
-This framework currently only works in [this build of of UTMT](https://github.com/krzys-h/UndertaleModTool/pull/1504). Until the pull request is approved, you will need
-to build the code for that if you want to use this.
+This framework only partly works in [this build of of UTMT](https://github.com/krzys-h/UndertaleModTool/pull/1504). If you are using a base `.csx` script (details below), until the pull request is approved, you will need to build the code for that if you want to use this.
 
 # Welcome to UMP - A mini framework for modding with Undertale Mod Tool
 
@@ -38,4 +37,4 @@ If your project contains no `.csx` script, then:
 
 # Guide/Tutorial
 
-See:
+See: [Guide on how to use the framework](https://github.com/nhaar/UMP/blob/main/guide/guide.md)
