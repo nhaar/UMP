@@ -27,6 +27,9 @@ void UMPMain ()
 
     List<string> notFunctionFiles = new();
 
+    Dictionary<string, string> functionCode = new();
+    Dictionary<string, string> functionNames = new();
+
     // first check: function separation and object creation
     foreach (string file in files)
     {
@@ -35,6 +38,88 @@ void UMPMain ()
         string code = File.ReadAllText(file);
         if (code.StartsWith("/// IGNORE"))
             continue;
+        // "opening" function files
+        else if (code.StartsWith("/// FUNCTIONS"))
+        {
+            string currentFunction = "";
+            int i = 0;
+            int start = 0;
+            int depth = 0;
+            while (i < code.Length)
+            {
+                char c = code[i];
+                if (c == 'f')
+                {
+                    if (code.Substring(i, 8) == "function")
+                    {
+                        start = i;
+                        i += 8;
+                        int nameStart = i;
+                        while (code[i] != '(')
+                        {
+                            i++;
+                        }
+                        string functionName = code.Substring(nameStart, i - nameStart).Trim();
+                        List<string> args = new();
+                        nameStart = i + 1;
+                        while (true)
+                        {
+                            bool endLoop = code[i] == ')';
+                            if (code[i] == ',' || endLoop)
+                            {
+                                args.Add(code.Substring(nameStart, i - nameStart).Trim());
+                                nameStart = i + 1;
+                                if (endLoop)
+                                    break;
+                            }
+                            i++;
+                        }
+                        while (code[i] != '{')
+                        {
+                            i++;
+                        }
+                        int codeStart = i + 1;
+                        do
+                        {
+                            if (code[i] == '{')
+                            {
+                                depth++;
+                            }
+                            else if (code[i] == '}')
+                            {
+                                depth--;
+                            }
+                            i++;
+                        }
+                        while (depth > 0);
+                        // - 1 at the end to remove the last }
+                        string functionCodeBlock = code.Substring(codeStart, i - codeStart - 1);
+
+                        // initializing args, unless they are argumentN in gamemaker because those already work normally
+                        foreach (string arg in args)
+                        {
+                            if (arg.StartsWith("argument"))
+                            {
+                                continue;
+                            }
+                            else
+                            {
+                                functionCodeBlock = $"var {arg} = argument{args.IndexOf(arg) + 1};" + functionCodeBlock;
+                            }
+                        }
+                        functionCodeBlock = $"function {functionName}() {{ {functionCodeBlock} }}";
+                        string entryName = $"gml_GlobalScript_{functionName}";
+                        Console.WriteLine(functionName);
+                        functionCode[entryName] = functionCodeBlock;
+                        functionNames[entryName] = functionName;
+                    }
+                }
+                i++;
+            }
+
+            // skip this file
+            continue;
+        }
 
         // extract name from event ending in number or with collision which can not end in a number
         string objName = Regex.Match(file, @"(?<=gml_Object_).*?((?=(_[a-zA-Z]+_\d+))|(?=_Collision))").Value;
@@ -55,10 +140,11 @@ void UMPMain ()
         }
     }
 
-    Dictionary<string, string> functionCode = new();
-    Dictionary<string, string> functionNames = new();
     foreach (string file in functionFiles)
     {
+        // this is for the automatically added from /// FUNCTIONS type files
+        if (functionCode.ContainsKey(file)) continue;
+
         string code = File.ReadAllText(file);
         string functionName = Regex.Match(file, @"(?<=(gml_Script_|gml_GlobalScript_)).*?(?=\.gml)").Value;
         functionCode[file] = code;
@@ -95,7 +181,7 @@ void UMPMain ()
 
     foreach (string file in functionsInOrder)
     {
-        UMPImportFile(file);
+        UMPImportGML(file.Replace(".gml", ""), functionCode[file]);
     }
     foreach (string file in notFunctionFiles)
     {

@@ -182,6 +182,43 @@ line3 = 3
 
 If you want to include `.gml` files in the mod folder and not manually add them, you can add `/// IGNORE` to their first line.
 
+# Function files
+
+UMP supports a custom syntax to define multiple functions in one file. First, write the first line of the file as being `/// FUNCTIONS`.
+
+```gml
+/// FUNCTIONS
+```
+
+Then, the functions can be defined as normally
+
+```gml
+/// FUNCTIONS
+
+function hello()
+{
+    return "Hello";
+}
+
+function world(argument0)
+{
+    return is_undefined(argument0) ? "World!" : argument0;
+}
+```
+
+Normally, UTMT only accepts arguments named like `argument0, ... argumentN`. This is not the case with functions defined in a UMP function file
+
+```gml
+function named_arg(i_have_name)
+{
+    return i_have_name;
+}
+```
+
+Naturally, `argumentN` still works as normal.
+
+Note that hoisting is done as it normally is with other functions: You can use functions before defining them in the file, you just can't have circular dependence.
+
 # Mod API
 
 Aditionally, if you are loading the mod inside another `.csx` script, you can use the API given by the mod, which consists of some functions and variables, some more useful than others, listed below
