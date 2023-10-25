@@ -145,7 +145,10 @@ void UMPMain ()
         }
         if (file.Contains("gml_GlobalScript") || file.Contains("gml_Script"))
         {
-            functionFiles.Add(file);
+            string entryName = Path.GetFileNameWithoutExtension(file);
+            string functionName = Regex.Match(entryName, @"(?<=(gml_Script_|gml_GlobalScript_))[_\d\w]+").Value;
+
+            functions.Add(new UMPFunctionEntry(entryName, code, functionName));
         }
         else
         {
@@ -160,14 +163,6 @@ void UMPMain ()
             }
             nonFunctions.Add(new UMPCodeEntry(entryName, code));
         }
-    }
-
-    foreach (string file in functionFiles)
-    {
-        string code = File.ReadAllText(file);
-        string entryName = Path.GetFileNameWithoutExtension(file);
-        string functionName = Regex.Match(entryName, @"(?<=(gml_Script_|gml_GlobalScript_))[_\d\w]+").Value;
-        functions.Add(new UMPFunctionEntry(entryName, code, functionName));
     }
 
     // order functions so that they never call functions not yet defined
