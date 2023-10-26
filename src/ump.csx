@@ -6,6 +6,28 @@ using System.Linq;
 // used for decompiling
 ThreadLocal<GlobalDecompileContext> UMP_DECOMPILE_CONTEXT = new ThreadLocal<GlobalDecompileContext>(() => new GlobalDecompileContext(Data, false));
 
+// the path to the MAIN script (not this one)
+string UMP_SCRIPT_DIR = Path.GetDirectoryName(ScriptPath);
+
+// the config file for UMP
+Dictionary<string, object> UMP_CONFIG = JsonConvert.DeserializeObject<Dictionary<string, object>>(File.ReadAllText(Path.Combine(UMP_SCRIPT_DIR, "ump-config.json"))); 
+
+// the path to all folders that will have the files that will be automatically read
+string UMP_MOD_PATH = (string)UMP_CONFIG["mod-path"];
+
+// prefixes for game object files
+List<string> UMP_OBJECT_PREFIXES = new();
+try
+{
+    UMP_OBJECT_PREFIXES = ((Newtonsoft.Json.Linq.JArray)UMP_CONFIG["object-prefixes"]).ToObject<List<string>>();
+}
+catch (System.Exception)
+{        
+}
+
+// all files that will be read
+string[] UMP_MOD_FILES = Directory.GetFiles(Path.Combine(UMP_SCRIPT_DIR, UMP_MOD_PATH), "*.gml", SearchOption.AllDirectories);
+
 // exceptions need to be logged if the file is being loaded, otherwise UTMT crashes
 try
 {
@@ -23,31 +45,12 @@ catch (Exception e)
 /// </summary>
 void UMPMain ()
 {
-
-    var scriptDir = Path.GetDirectoryName(ScriptPath);
-    string config = File.ReadAllText(Path.Combine(scriptDir, "ump-config.json"));
-    Dictionary<string, object> umpConfig = JsonConvert.DeserializeObject<Dictionary<string, object>>(config);
-
-    // the path to all folders that will have the files that will be automatically read
-    string modPath = (string)umpConfig["mod-path"];
-
-    List<string> objectPrefixes = new();
-    try
-    {
-        objectPrefixes = ((Newtonsoft.Json.Linq.JArray)umpConfig["object-prefixes"]).ToObject<List<string>>();
-    }
-    catch (System.Exception)
-    {        
-    }
-
-    string[] files = Directory.GetFiles(Path.Combine(scriptDir, modPath), "*.gml", SearchOption.AllDirectories);
-
     List<UMPFunctionEntry> functions = new();
     List<UMPCodeEntry> nonFunctions = new();
     Dictionary<string, string> functionNames = new();
 
     // first check: function separation and object creation
-    foreach (string file in files)
+    foreach (string file in UMP_MOD_FILES)
     {
         string code = File.ReadAllText(file);
         // ignoring files
@@ -150,15 +153,7 @@ void UMPMain ()
         else
         {
             string entryName = Path.GetFileNameWithoutExtension(file);
-            foreach (string prefix in objectPrefixes)
-            {
-                if (entryName.StartsWith(prefix))
-                {
-                    entryName = $"gml_Object_{entryName}";
-                    break;
-                }
-            }
-            nonFunctions.Add(new UMPCodeEntry(entryName, code));
+            nonFunctions.Add(new UMPCodeEntry(UMPPrefixEntryName(entryName), code));
         }
     }
 
@@ -167,7 +162,7 @@ void UMPMain ()
     foreach (UMPCodeEntry entry in nonFunctions)
     {
         // extract name from event ending in number or with collision which can not end in a number
-        string objName = Regex.Match(entry.Name, @"(?<=gml_Object_).*?((?=(_[a-zA-Z]+_\d+))|(?=_Collision))").Value;
+        string objName = UMPGetObjectName(entry.Name);
         if (objName != "")
         {
             if (Data.GameObjects.ByName(objName) == null)
@@ -246,6 +241,7 @@ void UMPImportFile (string path)
 /// <exception cref="Exception"></exception>
 void UMPImportGML (string codeName, string code)
 {
+    codeName = UMPPrefixEntryName(codeName);
     var isPatchFile = UMPHasCommand(code, "PATCH") && UMPCheckIfCodeExists(codeName);
 
     if (isPatchFile)
@@ -445,8 +441,8 @@ class UMPPatchFile
                     if (inOriginalText)
                     {
                         if (Regex.IsMatch(line, @"\bCODE\b"))
-                    {
-                        inOriginalText = false;
+                        {
+                            inOriginalText = false;
                         }
                         else
                         {
@@ -600,4 +596,31 @@ class UMPFunctionEntry : UMPCodeEntry
 bool UMPHasCommand (string code, string command)
 {
     return Regex.IsMatch(code, @$"^\s*/// {command}", RegexOptions.Multiline);
+}
+
+/// <summary>
+/// Get the name of the game object from a code entry that belongs to the object (in the UTMT code entry name format)
+/// </summary>
+/// <param name="entryName"></param>
+/// <returns></returns>
+string UMPGetObjectName (string entryName)
+{
+    return Regex.Match(entryName, @"(?<=gml_Object_).*?((?=(_[a-zA-Z]+_\d+))|(?=_Collision))").Value;
+}
+
+/// <summary>
+/// Prefix a code entry name with the proper game object prefix if it has an object prefix defined in the config
+/// </summary>
+/// <param name="entryName"></param>
+/// <returns></returns>
+string UMPPrefixEntryName (string entryName)
+{
+    foreach (string prefix in UMP_OBJECT_PREFIXES)
+    {
+        if (entryName.StartsWith(prefix))
+        {
+            return$"gml_Object_{entryName}";
+        }
+    }
+    return entryName;
 }

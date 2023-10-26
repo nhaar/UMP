@@ -329,8 +329,65 @@ The name of the code entry
 
 `true` if the code entry exists, `false` if it doesn't
 
+## UMPGetObjectName Method
+
+### Definition
+
+Get the name of the game object from a code entry that belongs to the object (in the UTMT code entry name format). For example, the name of the game object from the code entry `gml_Object_obj_time_Create_0` is `obj_time`.
+
+### Parameters
+
+`entryName` String
+
+The name of the code entry
+
+### Returns
+`string`
+
+The name of the game object
+
+## UMPPrefixEntryName Method
+
+### Definition
+
+Takes a name, and if necessary adds the UTMT object prefix to it, if the name given starts with any of the object prefixes defined in the config file. If not, it returns the inputted string. For example, it can transform `obj_time` -> `gml_Object_obj_time`, of `obj_` is in the object prefixes in the config file.
+
+### Returns
+`string`
+
+The entry name, prefixed if needed.
+
 ## UMP_DECOMPILE_CONTEXT Variable
+
+### Type
+`ThreadLocal<GlobalDecompileContext>`
 
 ### Definition
 
 An instance of a `ThreadLocal<GlobalDecompileContext>` that you can use to decompile code.
+
+## UMP_SCRIPT_DIR Variable
+
+### Type
+`string`
+
+### Definition
+
+The path to the directory that contains the main script that is being ran by UndertaleModTool.
+
+## UMP_MOD_PATH Variable
+
+### Type
+`string`
+
+### Definition
+
+The path to the mod folder.
+
+## UMP_MOD_FILES Variable
+
+### Type
+`string[]`
+
+### Definition
+An array with all the `gml` files inside the mod folder.
