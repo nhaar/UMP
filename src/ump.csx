@@ -51,10 +51,10 @@ void UMPMain ()
     {
         string code = File.ReadAllText(file);
         // ignoring files
-        if (code.StartsWith("/// IGNORE"))
+        if (UMPHasCommand(code, "IGNORE"))
             continue;
         // "opening" function files
-        else if (code.StartsWith("/// FUNCTIONS"))
+        else if (UMPHasCommand(code, "FUNCTIONS"))
         {
             string currentFunction = "";
             int i = 0;
@@ -246,11 +246,11 @@ void UMPImportFile (string path)
 /// <exception cref="Exception"></exception>
 void UMPImportGML (string codeName, string code)
 {
-    var isPatchFile = code.StartsWith("/// PATCH") && UMPCheckIfCodeExists(codeName);
+    var isPatchFile = UMPHasCommand(code, "PATCH") && UMPCheckIfCodeExists(codeName);
 
     if (isPatchFile)
     {
-        UMPPatchFile patch = new UMPPatchFile(code);
+        UMPPatchFile patch = new UMPPatchFile(code, codeName);
         if (patch.RequiresCompilation)
         {
             UMPAddCodeToPatch(patch, codeName);
@@ -426,15 +426,7 @@ class UMPPatchFile
     /// </summary>
     public string Code { get; set ; }
 
-    /// <summary>
-    /// Exception thrown when a command is not recognized
-    /// </summary>
-    public class ModifiedCommandException : Exception
-    {
-        public ModifiedCommandException(string line) : base("Unknown command in modified code: " + line) { }
-    }
-
-    public UMPPatchFile (string gmlCode)
+    public UMPPatchFile (string gmlCode, string entryName)
     {
         gmlCode = gmlCode.Substring(gmlCode.IndexOf('\n') + 1);
         string[] patchLines = gmlCode.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None);
@@ -450,9 +442,16 @@ class UMPPatchFile
             {
                 if (line.StartsWith("///"))
                 {
-                    if (Regex.IsMatch(line, @"\bCODE\b"))
+                    if (inOriginalText)
+                    {
+                        if (Regex.IsMatch(line, @"\bCODE\b"))
                     {
                         inOriginalText = false;
+                        }
+                        else
+                        {
+                            throw new Exception($"Error in patch file \"{entryName}\": Expected CODE command");
+                        }
                     }
                     else if (Regex.IsMatch(line, @"\bEND\b"))
                     {
@@ -467,7 +466,7 @@ class UMPPatchFile
                     }
                     else
                     {
-                        throw new ModifiedCommandException(line);
+                        throw new Exception($"Error in patch file \"{entryName}\": Expected END command");
                     }
                 }
                 else
@@ -510,7 +509,7 @@ class UMPPatchFile
                     }
                     else
                     {
-                        throw new ModifiedCommandException(line);
+                        Console.WriteLine("WARNING: Unknown command in patch file: " + line);
                     }
                 }
             }
@@ -596,4 +595,9 @@ class UMPFunctionEntry : UMPCodeEntry
     {
         FunctionName = functionName;
     }
+}
+
+bool UMPHasCommand (string code, string command)
+{
+    return Regex.IsMatch(code, @$"^\s*/// {command}", RegexOptions.Multiline);
 }
