@@ -49,7 +49,7 @@ void UMPMain ()
     try
     {
         string enumFile = UMP_CONFIG["enum-file"] as string;
-        EnumImporter enumImporter = new EnumImporter(File.ReadAllText(Path.Combine(UMP_SCRIPT_DIR, enumFile)));
+        enumImporter = new EnumImporter(File.ReadAllText(Path.Combine(UMP_SCRIPT_DIR, enumFile)));
     }
     catch (Exception)
     {
@@ -153,6 +153,17 @@ void UMPMain ()
             continue;
         }
 
+        if (UMPHasCommand(code, "USE ENUM"))
+        {
+            foreach (string enumName in enumImporter.Enums.Keys)
+            {
+                foreach (string enumMember in enumImporter.Enums[enumName].Keys)
+                {
+                    code = code.Replace($"{enumName}.{enumMember}", enumImporter.Enums[enumName][enumMember].ToString());
+                }
+            }
+        }
+        
         if (file.Contains("gml_GlobalScript") || file.Contains("gml_Script"))
         {
             string entryName = Path.GetFileNameWithoutExtension(file);
@@ -651,7 +662,6 @@ class EnumImporter
     /// <param name="enumFile">Path to the CSX file to read</param>
     public EnumImporter (string enumFile)
     {
-        EnumFile = enumFile;
         Enums = new();
         Tokenizer tokenizer = new Tokenizer(enumFile);
         Parser parser = new(tokenizer);
