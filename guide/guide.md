@@ -231,6 +231,64 @@ Naturally, `argumentN` still works as normal.
 
 Note that hoisting is done as it normally is with other functions: You can use functions before defining them in the file, you just can't have circular dependence.
 
+# Enums
+
+Enums are part of the current verison of GML, but not supported in UTMT. An implementation of enums can be used with UMP files, but not using the same syntax of enums as in standard GML, but instead, a mix of CSX files and UMP commands.
+
+## Setup
+
+1. First, you must create your enums. Create a C# code file including ONLY ENUMS, and no comments or any other code, such as
+
+```cs
+enum TestEnum
+{
+    A,
+    B,
+    C = 4,
+}
+```
+
+2. Then, in your `ump-config` file, add the path to the enum file using `enum-file`:
+
+```json
+{
+    "enum-file": "enum.csx" // relative to the main script
+}
+```
+
+3. Finally, you can use the enums inside your GML code by using the command `/// USE ENUM` anywhere in your file. An example of a `.gml` file using the enums from UMP:
+
+```gml
+/// USE ENUM
+show_debug_message(Test.A)
+show_debug_message(Test.B)
+show_debug_message(Test.C)
+```
+
+This will be compiled as:
+```gml
+show_debug_message(0)
+show_debug_message(1)
+show_debug_message(4)
+```
+
+## Converting Case
+
+If you bother to keep a consistent and different case between your `.csx` files and `.gml` files, you can use the case converting option. The cases for the enum name and members are assumed to be pascal case (PascalCase). You can convert it to either camel case (camelCase), snake case (snake_case) or screaming snake case (SCREAMING_SNAKE_CASE). To do this, include in your `ump-config` file first the key `case-converter` set to `true`, and then the keys `enum-name-case` and `enum-member-case` can be added if you want to change their case. The values of the cases must be one of these:
+* `snake-case`
+* `screaming-snake-case`
+* `camel-case`
+
+Example"
+
+```json
+{
+    "case-converter": true,
+    "enum-name-case": "screaming-snake-case",
+    "enum-member-case": "snake-case"
+}
+```
+
 # Mod API
 
 Aditionally, if you are loading the mod inside another `.csx` script, you can use the API given by the mod, which consists of some functions and variables, some more useful than others, listed below

@@ -17,6 +17,8 @@ existing objects and scripts, which is already an UTMT feature, but also:
 
 * Allow defining multiple functions in one file
 
+* Allow using enums (check guide for syntax) in the GML files (enums exist in normal GML, but not supported in UTMT)
+
 * Extra useful API that can be used inside the `.csx` scripts
 
 The framework is meant to be used alongside a base `.csx` script, or if you do not wish to use any custom scripting code, you can use it directly.
