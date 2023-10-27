@@ -45,6 +45,16 @@ catch (Exception e)
 /// </summary>
 void UMPMain ()
 {
+    EnumImporter enumImporter = null;
+    try
+    {
+        string enumFile = UMP_CONFIG["enum-file"] as string;
+        EnumImporter enumImporter = new EnumImporter(File.ReadAllText(Path.Combine(UMP_SCRIPT_DIR, enumFile)));
+    }
+    catch (Exception)
+    {
+    }
+
     List<UMPFunctionEntry> functions = new();
     List<UMPCodeEntry> nonFunctions = new();
     Dictionary<string, string> functionNames = new();
@@ -623,4 +633,311 @@ string UMPPrefixEntryName (string entryName)
         }
     }
     return entryName;
+}
+
+/// <summary>
+/// Class handles the system that translates enums from a CSX file to variables useable by UMP GML files
+/// </summary>
+class EnumImporter
+{
+    /// <summary>
+    /// A dictionary that maps the name of the enum to a dictionary that maps the name of the enum member to its value
+    /// </summary>
+    public Dictionary<string, Dictionary<string, int>> Enums;
+
+    /// <summary>
+    /// Instantiate with enums from a file
+    /// </summary>
+    /// <param name="enumFile">Path to the CSX file to read</param>
+    public EnumImporter (string enumFile)
+    {
+        EnumFile = enumFile;
+        Enums = new();
+        Tokenizer tokenizer = new Tokenizer(enumFile);
+        Parser parser = new(tokenizer);
+        foreach (Parser.EnumTree tree in parser.EnumTrees)
+        {
+            Enums.Add(tree.EnumName, tree.Members);
+        }
+    }
+
+    /// <summary>
+    /// Parser that generates enums from the tokens
+    /// </summary>
+    public class Parser
+    {
+        /// <summary>
+        /// A structure that represents an enum
+        /// </summary>
+        public class EnumTree
+        {
+            /// <summary>
+            /// The name of the enum
+            /// </summary>
+            public string EnumName { get; set; }
+
+            /// <summary>
+            /// A dictionary that maps the name of the enum member to its value
+            /// </summary>
+            public Dictionary<string, int> Members { get; set; }
+
+            /// <summary>
+            /// Instantiate with the name of the enum and no members
+            /// </summary>
+            /// <param name="name"></param>
+            public EnumTree (string name)
+            {
+                EnumName = name;
+                Members = new();
+            }
+        }
+
+        /// <summary>
+        /// A list of all the enums parsed
+        /// </summary>
+        public List<EnumTree> EnumTrees { get; set; }
+
+        /// <summary>
+        /// Exception thrown when the parser encounters an unexpected token
+        /// </summary>
+        public class TokenException : Exception
+        {
+            /// <summary>
+            /// Throw exception
+            /// </summary>
+            /// <param name="found">Found token</param>
+            /// <param name="expected">Expected token</param>
+            public TokenException (Tokenizer.TokenType found, Tokenizer.TokenType expected) : base
+            (
+                $"Unexpected token: {found}, expected {expected}"
+            )
+            {}
+        }
+
+        /// <summary>
+        /// Parses results from a tokenizer
+        /// </summary>
+        /// <param name="tokenizer">Tokenizer that read the CSX file</param>
+        /// <exception cref="TokenException">If an unexpected token is found</exception>
+        public Parser (Tokenizer tokenizer)
+        {
+            EnumTrees = new();
+
+            EnumTree currentTree = null;
+            int currentEnumValue;
+
+            int i = 0;
+            while (i < tokenizer.Tokens.Count)
+            {
+                Tokenizer.Token token = tokenizer.Tokens[i];
+                if (token.Type == Tokenizer.TokenType.Enum)
+                {
+                    i++;
+                    if (tokenizer.Tokens[i].Type != Tokenizer.TokenType.EnumName)
+                    {
+                        throw new TokenException(token.Type, Tokenizer.TokenType.EnumName);
+                    }
+                    currentTree = new EnumTree(tokenizer.Tokens[i].Value);
+                    currentEnumValue = 0;
+                    EnumTrees.Add(currentTree);
+                    i++;
+                    if (tokenizer.Tokens[i].Type != Tokenizer.TokenType.EnumStart)
+                    {
+                        throw new TokenException(token.Type, Tokenizer.TokenType.EnumStart);
+                    }
+                    i++;
+                    while (i < tokenizer.Tokens.Count)
+                    {
+                        token = tokenizer.Tokens[i];
+                        if (token.Type == Tokenizer.TokenType.EnumEnd)
+                        {
+                            i++;
+                            break;
+                        }
+                        else if (token.Type == Tokenizer.TokenType.EnumName)
+                        {
+                            string memberName = token.Value;
+                            i++;
+                            if (tokenizer.Tokens[i].Type == Tokenizer.TokenType.EnumEquals)
+                            {
+                                i++;
+                                if (tokenizer.Tokens[i].Type != Tokenizer.TokenType.EnumValue)
+                                {
+                                    throw new TokenException(token.Type, Tokenizer.TokenType.EnumValue);
+                                }
+                                currentEnumValue = int.Parse(tokenizer.Tokens[i].Value);
+                                currentTree.Members.Add(memberName, currentEnumValue);
+                                currentEnumValue++;
+                                i++;
+                                if (tokenizer.Tokens[i].Type != Tokenizer.TokenType.Comma)
+                                {
+                                    throw new TokenException(token.Type, Tokenizer.TokenType.Comma);
+                                }
+                                i++;
+                            }
+                            else
+                            {
+                                currentTree.Members.Add(memberName, currentEnumValue);
+                                currentEnumValue++;
+                                if (tokenizer.Tokens[i].Type != Tokenizer.TokenType.Comma)
+                                {
+                                    throw new TokenException(token.Type, Tokenizer.TokenType.Comma);
+                                }
+                                i++;
+                            }
+                        }
+                        else
+                        {
+                            throw new TokenException(token.Type, Tokenizer.TokenType.EnumName);
+                        }
+                    }
+                }
+                else
+                {
+                    throw new TokenException(token.Type, Tokenizer.TokenType.Enum);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Creates token from the CSX file for enums
+    /// </summary>
+    public class Tokenizer
+    {
+        /// <summary>
+        /// All tokens in the CSX file
+        /// </summary>
+        public List<Token> Tokens;
+
+        /// <summary>
+        /// A token in the CSX file
+        /// </summary>
+        public class Token
+        {
+            /// <summary>
+            /// The type of the token
+            /// </summary>
+            public TokenType Type { get; set; }
+
+            /// <summary>
+            /// The value of the token, if applicable
+            /// </summary>
+            public string Value { get; set; }
+
+            public Token (TokenType type, string value = "")
+            {
+                Type = type;
+                Value = value;
+            }
+        }
+
+        /// <summary>
+        /// Type of a token in the CSX file
+        /// </summary>
+        public enum TokenType
+        {
+            /// <summary>
+            /// Keyword "enum" that defines a new enum
+            /// </summary>
+            Enum,
+            /// <summary>
+            /// Any word, though it is expected to be the name of an enum or enum member
+            /// </summary>
+            EnumName,
+            /// <summary>
+            /// Opening brace
+            /// </summary>
+            EnumStart,
+            /// <summary>
+            /// Equal sign
+            /// </summary>
+            EnumEquals,
+            /// <summary>
+            /// Any number, though it is expected to be the value of an enum member
+            /// </summary>
+            EnumValue,
+            /// <summary>
+            /// Comma
+            /// </summary>
+            Comma,
+            /// <summary>
+            /// Closing brace
+            /// </summary>
+            EnumEnd
+        }
+
+        /// <summary>
+        /// Instantiate and create tokens
+        /// </summary>
+        /// <param name="code">CSX code with enums</param>
+        public Tokenizer (string code)
+        {
+            Tokens = new();
+            int i = 0;
+            while (i < code.Length)
+            {
+                char c = code[i];
+                if (c == 'e')
+                {
+                    if (code.Substring(i, 4) == "enum")
+                    {
+                        Tokens.Add(new Token(TokenType.Enum));
+                        i += 4;
+                    }
+                }
+                else if (c == ' ')
+                {
+                    i++;
+                }
+                else if (c == '{')
+                {
+                    Tokens.Add(new Token(TokenType.EnumStart));
+                    i++;
+                }
+                else if (c == '}')
+                {
+                    Tokens.Add(new Token(TokenType.EnumEnd));
+                    i++;
+                }
+                else if (c == '=')
+                {
+                    Tokens.Add(new Token(TokenType.EnumEquals));
+                    i++;
+                }
+                else if (c == ',')
+                {
+                    Tokens.Add(new Token(TokenType.Comma));
+                    i++;
+                }
+                else if (char.IsLetter(c))
+                {
+                    int start = i;
+                    string value = "";
+
+                    while (char.IsLetterOrDigit(code[i]))
+                    {
+                        value += code[i];
+                        i++;
+                    }
+                    Tokens.Add(new Token(TokenType.EnumName, value));
+                }
+                else if (char.IsDigit(c))
+                {
+                    int start = i;
+                    string value = "";
+                    while (char.IsDigit(code[i]))
+                    {
+                        value += code[i];
+                        i++;
+                    }
+                    Tokens.Add(new Token(TokenType.EnumValue, value));
+                }
+                else
+                {
+                    i++;
+                }
+            }
+        }
+    }
 }
