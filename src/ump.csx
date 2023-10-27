@@ -15,6 +15,8 @@ Dictionary<string, object> UMP_CONFIG = JsonConvert.DeserializeObject<Dictionary
 // the path to all folders that will have the files that will be automatically read
 string UMP_MOD_PATH = (string)UMP_CONFIG["mod-path"];
 
+EnumImporter UMP_ENUM_IMPORTER = null;
+
 // prefixes for game object files
 List<string> UMP_OBJECT_PREFIXES = new();
 try
@@ -45,11 +47,10 @@ catch (Exception e)
 /// </summary>
 void UMPMain ()
 {
-    EnumImporter enumImporter = null;
     try
     {
         string enumFile = UMP_CONFIG["enum-file"] as string;
-        enumImporter = new EnumImporter(File.ReadAllText(Path.Combine(UMP_SCRIPT_DIR, enumFile)));
+        UMP_ENUM_IMPORTER = new EnumImporter(File.ReadAllText(Path.Combine(UMP_SCRIPT_DIR, enumFile)));
 
         // converting enum cases if enabled
         try
@@ -60,12 +61,12 @@ void UMPMain ()
                 try
                 {
                     CaseConverter.NameCase enumNameCase = CaseConverter.CaseFromString(UMP_CONFIG["enum-name-case"] as string);
-                    string[] keys = enumImporter.Enums.Keys.ToArray();
+                    string[] keys = UMP_ENUM_IMPORTER.Enums.Keys.ToArray();
                     foreach (string enumName in keys)
                     {
                         string newName = CaseConverter.Convert(enumNameCase, enumName);
-                        enumImporter.Enums.Add(newName, enumImporter.Enums[enumName]);
-                        enumImporter.Enums.Remove(enumName);
+                        UMP_ENUM_IMPORTER.Enums.Add(newName, UMP_ENUM_IMPORTER.Enums[enumName]);
+                        UMP_ENUM_IMPORTER.Enums.Remove(enumName);
                     }
                 }
                 catch (Exception)
@@ -74,15 +75,15 @@ void UMPMain ()
                 try
                 {
                     CaseConverter.NameCase enumMemberCase = CaseConverter.CaseFromString(UMP_CONFIG["enum-member-case"] as string);
-                    foreach (string enumName in enumImporter.Enums.Keys)
+                    foreach (string enumName in UMP_ENUM_IMPORTER.Enums.Keys)
                     {
                         Dictionary<string, int> newMembers = new();
-                        foreach (string enumMember in enumImporter.Enums[enumName].Keys)
+                        foreach (string enumMember in UMP_ENUM_IMPORTER.Enums[enumName].Keys)
                         {
                             string newMemberName = CaseConverter.Convert(enumMemberCase, enumMember);
-                            newMembers.Add(newMemberName, enumImporter.Enums[enumName][enumMember]);
+                            newMembers.Add(newMemberName, UMP_ENUM_IMPORTER.Enums[enumName][enumMember]);
                         }
-                        enumImporter.Enums[enumName] = newMembers;
+                        UMP_ENUM_IMPORTER.Enums[enumName] = newMembers;
                     }
                 }
                 catch (Exception)
@@ -107,30 +108,13 @@ void UMPMain ()
     {
         string code = File.ReadAllText(file);
     
-        if (UMPHasCommand(code, "USE ENUM"))
-        {
-            string enumsDeclaration = Regex.Match(code, @"(?<=USE ENUM).*$", RegexOptions.Multiline).Value.Trim();
-            string[] enums = enumsDeclaration.Split(',').Select(s => s.Trim()).ToArray();
-            foreach (string enumName in enums)
-            {
-                if (!enumImporter.Enums.ContainsKey(enumName))
-                {
-                    Console.WriteLine(enumImporter.Enums.Keys);
-                    throw new Exception($"Enum \"{enumName}\" not found in enum file");
-                }
-                foreach (string enumMember in enumImporter.Enums[enumName].Keys)
-                {
-                    code = code.Replace($"{enumName}.{enumMember}", enumImporter.Enums[enumName][enumMember].ToString());
-                }
-            }
-        }
-
         // ignoring files
         if (UMPHasCommand(code, "IGNORE"))
             continue;
         // "opening" function files
         else if (UMPHasCommand(code, "FUNCTIONS"))
         {
+            string enumsDeclaration = Regex.Match(code, @"/// USE ENUM.*$", RegexOptions.Multiline).Value.Trim();
             string currentFunction = "";
             int i = 0;
             int start = 0;
@@ -203,7 +187,7 @@ void UMPMain ()
                                 functionCodeBlock = $"var {arg} = argument{j};" + functionCodeBlock;
                             }
                         }
-                        functionCodeBlock = $"function {functionName}({string.Join(", ", gmlArgs)}) {{ {functionCodeBlock} }}";
+                        functionCodeBlock = $"{enumsDeclaration}\nfunction {functionName}({string.Join(", ", gmlArgs)}) {{ {functionCodeBlock} }}";
                         string entryName = $"gml_GlobalScript_{functionName}";
                         functions.Add(new UMPFunctionEntry(entryName, functionCodeBlock, functionName));
                     }
@@ -314,6 +298,25 @@ void UMPImportFile (string path)
 void UMPImportGML (string codeName, string code)
 {
     codeName = UMPPrefixEntryName(codeName);
+    
+    if (UMPHasCommand(code, "USE ENUM"))
+    {
+        string enumsDeclaration = Regex.Match(code, @"(?<=USE ENUM).*$", RegexOptions.Multiline).Value.Trim();
+        string[] enums = enumsDeclaration.Split(',').Select(s => s.Trim()).ToArray();
+        foreach (string enumName in enums)
+        {
+            if (!UMP_ENUM_IMPORTER.Enums.ContainsKey(enumName))
+            {
+                Console.WriteLine(UMP_ENUM_IMPORTER.Enums.Keys);
+                throw new Exception($"Enum \"{enumName}\" not found in enum file");
+            }
+            foreach (string enumMember in UMP_ENUM_IMPORTER.Enums[enumName].Keys)
+            {
+                code = Regex.Replace(code, @$"\b{enumName}.{enumMember}\b", UMP_ENUM_IMPORTER.Enums[enumName][enumMember].ToString());
+            }
+        }
+    }
+
     var isPatchFile = UMPHasCommand(code, "PATCH") && UMPCheckIfCodeExists(codeName);
 
     if (isPatchFile)
