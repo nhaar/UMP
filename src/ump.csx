@@ -105,6 +105,18 @@ void UMPMain ()
     foreach (string file in UMP_MOD_FILES)
     {
         string code = File.ReadAllText(file);
+    
+        if (UMPHasCommand(code, "USE ENUM"))
+        {
+            foreach (string enumName in enumImporter.Enums.Keys)
+            {
+                foreach (string enumMember in enumImporter.Enums[enumName].Keys)
+                {
+                    code = code.Replace($"{enumName}.{enumMember}", enumImporter.Enums[enumName][enumMember].ToString());
+                }
+            }
+        }
+
         // ignoring files
         if (UMPHasCommand(code, "IGNORE"))
             continue;
@@ -193,17 +205,6 @@ void UMPMain ()
 
             // skip this file
             continue;
-        }
-
-        if (UMPHasCommand(code, "USE ENUM"))
-        {
-            foreach (string enumName in enumImporter.Enums.Keys)
-            {
-                foreach (string enumMember in enumImporter.Enums[enumName].Keys)
-                {
-                    code = code.Replace($"{enumName}.{enumMember}", enumImporter.Enums[enumName][enumMember].ToString());
-                }
-            }
         }
         
         if (file.Contains("gml_GlobalScript") || file.Contains("gml_Script"))
@@ -821,6 +822,11 @@ class EnumImporter
                                 currentTree.Members.Add(memberName, currentEnumValue);
                                 currentEnumValue++;
                                 i++;
+                                if (tokenizer.Tokens[i].Type == Tokenizer.TokenType.EnumEnd)
+                                {
+                                    i++;
+                                    break;
+                                }
                                 if (tokenizer.Tokens[i].Type != Tokenizer.TokenType.Comma)
                                 {
                                     throw new TokenException(token.Type, Tokenizer.TokenType.Comma);
@@ -831,6 +837,11 @@ class EnumImporter
                             {
                                 currentTree.Members.Add(memberName, currentEnumValue);
                                 currentEnumValue++;
+                                if (tokenizer.Tokens[i].Type == Tokenizer.TokenType.EnumEnd)
+                                {
+                                    i++;
+                                    break;
+                                }
                                 if (tokenizer.Tokens[i].Type != Tokenizer.TokenType.Comma)
                                 {
                                     throw new TokenException(token.Type, Tokenizer.TokenType.Comma);
