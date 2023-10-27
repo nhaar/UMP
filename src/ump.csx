@@ -50,6 +50,48 @@ void UMPMain ()
     {
         string enumFile = UMP_CONFIG["enum-file"] as string;
         enumImporter = new EnumImporter(File.ReadAllText(Path.Combine(UMP_SCRIPT_DIR, enumFile)));
+
+        // converting enum cases if enabled
+        try
+        {
+            bool caseConverter = (bool)UMP_CONFIG["case-converter"];
+            if (caseConverter)
+            {
+                try
+                {
+                    CaseConverter.NameCase enumNameCase = CaseConverter.CaseFromString(UMP_CONFIG["enum-name-case"] as string);
+                    foreach (string enumName in enumImporter.Enums.Keys)
+                    {
+                        string newName = CaseConverter.Convert(enumNameCase, enumName);
+                        enumImporter.Enums.Add(newName, enumImporter.Enums[enumName]);
+                        enumImporter.Enums.Remove(enumName);
+                    }
+                }
+                catch (Exception)
+                {                
+                }
+                try
+                {
+                    CaseConverter.NameCase enumMemberCase = CaseConverter.CaseFromString(UMP_CONFIG["enum-member-case"] as string);
+                    foreach (string enumName in enumImporter.Enums.Keys)
+                    {
+                        Dictionary<string, int> newMembers = new();
+                        foreach (string enumMember in enumImporter.Enums[enumName].Keys)
+                        {
+                            string newMemberName = CaseConverter.Convert(enumMemberCase, enumMember);
+                            newMembers.Add(newMemberName, enumImporter.Enums[enumName][enumMember]);
+                        }
+                        enumImporter.Enums[enumName] = newMembers;
+                    }
+                }
+                catch (Exception)
+                {
+                }
+            }
+        }
+        catch (Exception)
+        {        
+        }
     }
     catch (Exception)
     {
@@ -951,3 +993,123 @@ class EnumImporter
         }
     }
 }
+
+/// <summary>
+/// Handles converting from PASCAL CASE to other cases
+/// </summary>
+static class CaseConverter
+{
+    /// <summary>
+    /// Convert into a generic case
+    /// </summary>
+    /// <param name="nameCase">Case to convert to</param>
+    /// <param name="name">Name to change the case</param>
+    /// <returns>Converted name</returns>
+    /// <exception cref="Exception">If giving an unsupported case</exception>
+    public static string Convert (NameCase nameCase, string name)
+    {
+        switch (nameCase)
+        {
+            case NameCase.CamelCase:
+                return ToCamel(name);
+            case NameCase.SnakeCase:
+                return ToSnake(name);
+            case NameCase.ScreamingSnakeCase:
+                return ToScreamingSnake(name);
+            default:
+                throw new Exception($"Unsupported case: {nameCase}");
+        }
+    }
+
+    /// <summary>
+    /// Convert from pascal case to camel case
+    /// </summary>
+    /// <param name="pascalCase">String in pascal case</param>
+    /// <returns>String in camel case</returns>
+    public static string ToCamel (string pascalCase)
+    {
+        return pascalCase.Substring(0, 1).ToLower() + pascalCase.Substring(1);
+    }
+
+    /// <summary>
+    /// Convert from pascal case to snake case
+    /// </summary>
+    /// <param name="pascalCase">String in pascal case</param>
+    /// <returns>String in snake case</returns>
+    public static string ToSnake (string pascalCase)
+    {
+        string snakeCase = "";
+        for (int i = 0; i < pascalCase.Length; i++)
+        {
+            char c = pascalCase[i];
+            if (char.IsUpper(c))
+            {
+                snakeCase += "_" + char.ToLower(c);
+            }
+            else
+            {
+                snakeCase += c;
+            }
+        }
+        if (snakeCase.StartsWith("_"))
+        {
+            snakeCase = snakeCase.Substring(1);
+        }
+        return snakeCase;
+    }
+
+    /// <summary>
+    /// Convert from pascal case to screaming snake case
+    /// </summary>
+    /// <param name="pascalCase">String in pascal case</param>
+    /// <returns>String in screaming snake case</returns>
+    public static string ToScreamingSnake (string pascalCase)
+    {
+        return CaseConverter.ToSnake(pascalCase).ToUpper();
+    }
+
+    /// <summary>
+    /// Get the name case from the name of the case as supported in the UMP config file
+    /// </summary>
+    /// <param name="caseName">Name of the case</param>
+    /// <returns>Case type</returns>
+    /// <exception cref="Exception">If an unknown case name is given</exception>
+    public static NameCase CaseFromString (string caseName)
+    {
+        switch (caseName)
+        {
+            case "camel-case":
+                return NameCase.CamelCase;
+            case "snake-case":
+                return NameCase.SnakeCase;
+            case "screaming-snake-case":
+                return NameCase.ScreamingSnakeCase;
+            default:
+                throw new Exception("Unknown case name: " + caseName);
+        }
+    }
+
+    /// <summary>
+    /// Represents a case for a name
+    /// </summary>
+    public enum NameCase
+    {
+        /// <summary>
+        /// Case "LikeThis"
+        /// </summary>
+        PascalCase,
+        /// <summary>
+        /// Case "likeThis"
+        /// </summary>
+        CamelCase,
+        /// <summary>
+        /// Case "like_this"
+        /// </summary>
+        SnakeCase,
+        /// <summary>
+        /// Case "LIKE_THIS"
+        /// </summary>
+        ScreamingSnakeCase
+    }
+}
+
