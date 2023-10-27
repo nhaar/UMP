@@ -109,8 +109,15 @@ void UMPMain ()
     
         if (UMPHasCommand(code, "USE ENUM"))
         {
-            foreach (string enumName in enumImporter.Enums.Keys)
+            string enumsDeclaration = Regex.Match(code, @"(?<=USE ENUM).*$", RegexOptions.Multiline).Value.Trim();
+            string[] enums = enumsDeclaration.Split(',').Select(s => s.Trim()).ToArray();
+            foreach (string enumName in enums)
             {
+                if (!enumImporter.Enums.ContainsKey(enumName))
+                {
+                    Console.WriteLine(enumImporter.Enums.Keys);
+                    throw new Exception($"Enum \"{enumName}\" not found in enum file");
+                }
                 foreach (string enumMember in enumImporter.Enums[enumName].Keys)
                 {
                     code = code.Replace($"{enumName}.{enumMember}", enumImporter.Enums[enumName][enumMember].ToString());

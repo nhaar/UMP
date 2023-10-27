@@ -246,6 +246,11 @@ enum TestEnum
     B,
     C = 4,
 }
+
+enum OtherEnum
+{
+    A = 5
+}
 ```
 
 2. Then, in your `ump-config` file, add the path to the enum file using `enum-file`:
@@ -256,13 +261,14 @@ enum TestEnum
 }
 ```
 
-3. Finally, you can use the enums inside your GML code by using the command `/// USE ENUM` anywhere in your file. An example of a `.gml` file using the enums from UMP:
+3. Finally, you can use the enums inside your GML code by using the command `/// USE ENUM` anywhere in your file, and add the names of the enums. An example of a `.gml` file using the enums from UMP:
 
 ```gml
-/// USE ENUM
+/// USE ENUM Test, OtherEnum
 show_debug_message(Test.A)
 show_debug_message(Test.B)
 show_debug_message(Test.C)
+show_debug_message(OtherEnum.A)
 ```
 
 This will be compiled as:
@@ -270,7 +276,10 @@ This will be compiled as:
 show_debug_message(0)
 show_debug_message(1)
 show_debug_message(4)
+show_debug_message(5)
 ```
+
+**WARNING**: If using the case converter, the enum name should be used AFTER the conversion (see below for details)
 
 ## Converting Case
 
