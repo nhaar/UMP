@@ -60,7 +60,8 @@ void UMPMain ()
                 try
                 {
                     CaseConverter.NameCase enumNameCase = CaseConverter.CaseFromString(UMP_CONFIG["enum-name-case"] as string);
-                    foreach (string enumName in enumImporter.Enums.Keys)
+                    string[] keys = enumImporter.Enums.Keys.ToArray();
+                    foreach (string enumName in keys)
                     {
                         string newName = CaseConverter.Convert(enumNameCase, enumName);
                         enumImporter.Enums.Add(newName, enumImporter.Enums[enumName]);
