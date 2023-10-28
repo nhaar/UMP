@@ -15,7 +15,7 @@ Dictionary<string, object> UMP_CONFIG = JsonConvert.DeserializeObject<Dictionary
 // the path to all folders that will have the files that will be automatically read
 string UMP_MOD_PATH = (string)UMP_CONFIG["mod-path"];
 
-EnumImporter UMP_ENUM_IMPORTER = null;
+UMPEnumImporter UMP_ENUM_IMPORTER = null;
 
 // prefixes for game object files
 List<string> UMP_OBJECT_PREFIXES = new();
@@ -50,7 +50,7 @@ void UMPMain ()
     try
     {
         string enumFile = UMP_CONFIG["enum-file"] as string;
-        UMP_ENUM_IMPORTER = new EnumImporter(File.ReadAllText(Path.Combine(UMP_SCRIPT_DIR, enumFile)));
+        UMP_ENUM_IMPORTER = new UMPEnumImporter(File.ReadAllText(Path.Combine(UMP_SCRIPT_DIR, enumFile)));
 
         // converting enum cases if enabled
         try
@@ -60,11 +60,11 @@ void UMPMain ()
             {
                 try
                 {
-                    CaseConverter.NameCase enumNameCase = CaseConverter.CaseFromString(UMP_CONFIG["enum-name-case"] as string);
+                    UMPCaseConverter.NameCase enumNameCase = UMPCaseConverter.CaseFromString(UMP_CONFIG["enum-name-case"] as string);
                     string[] keys = UMP_ENUM_IMPORTER.Enums.Keys.ToArray();
                     foreach (string enumName in keys)
                     {
-                        string newName = CaseConverter.Convert(enumNameCase, enumName);
+                        string newName = UMPCaseConverter.Convert(enumNameCase, enumName);
                         UMP_ENUM_IMPORTER.Enums.Add(newName, UMP_ENUM_IMPORTER.Enums[enumName]);
                         UMP_ENUM_IMPORTER.Enums.Remove(enumName);
                     }
@@ -74,13 +74,13 @@ void UMPMain ()
                 }
                 try
                 {
-                    CaseConverter.NameCase enumMemberCase = CaseConverter.CaseFromString(UMP_CONFIG["enum-member-case"] as string);
+                    UMPCaseConverter.NameCase enumMemberCase = UMPCaseConverter.CaseFromString(UMP_CONFIG["enum-member-case"] as string);
                     foreach (string enumName in UMP_ENUM_IMPORTER.Enums.Keys)
                     {
                         Dictionary<string, int> newMembers = new();
                         foreach (string enumMember in UMP_ENUM_IMPORTER.Enums[enumName].Keys)
                         {
-                            string newMemberName = CaseConverter.Convert(enumMemberCase, enumMember);
+                            string newMemberName = UMPCaseConverter.Convert(enumMemberCase, enumMember);
                             newMembers.Add(newMemberName, UMP_ENUM_IMPORTER.Enums[enumName][enumMember]);
                         }
                         UMP_ENUM_IMPORTER.Enums[enumName] = newMembers;
@@ -703,7 +703,7 @@ string UMPPrefixEntryName (string entryName)
 /// <summary>
 /// Class handles the system that translates enums from a CSX file to variables useable by UMP GML files
 /// </summary>
-class EnumImporter
+class UMPEnumImporter
 {
     /// <summary>
     /// A dictionary that maps the name of the enum to a dictionary that maps the name of the enum member to its value
@@ -714,7 +714,7 @@ class EnumImporter
     /// Instantiate with enums from a file
     /// </summary>
     /// <param name="enumFile">Path to the CSX file to read</param>
-    public EnumImporter (string enumFile)
+    public UMPEnumImporter (string enumFile)
     {
         Enums = new();
         Tokenizer tokenizer = new Tokenizer(enumFile);
@@ -1019,7 +1019,7 @@ class EnumImporter
 /// <summary>
 /// Handles converting from PASCAL CASE to other cases
 /// </summary>
-static class CaseConverter
+static class UMPCaseConverter
 {
     /// <summary>
     /// Convert into a generic case
@@ -1087,7 +1087,7 @@ static class CaseConverter
     /// <returns>String in screaming snake case</returns>
     public static string ToScreamingSnake (string pascalCase)
     {
-        return CaseConverter.ToSnake(pascalCase).ToUpper();
+        return UMPCaseConverter.ToSnake(pascalCase).ToUpper();
     }
 
     /// <summary>
