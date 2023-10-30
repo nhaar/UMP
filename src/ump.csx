@@ -14,35 +14,24 @@ void UMPLoad
     UMPCaseConverter.NameCase enumNameCase = UMPCaseConverter.NameCase.PascalCase,
     UMPCaseConverter.NameCase enumMemberCase = UMPCaseConverter.NameCase.PascalCase,
     string[] objectPrefixes = null,
-    bool useIgnore = true
+    bool useIgnore = true,
+    string[] symbols = null
 )
 {
-    string[] gmlFiles = null;
-    string[] asmFiles = null;
+    string[] allFiles = null;
     string searchPath = Path.Combine(Path.GetDirectoryName(ScriptPath), modPath);
     if (File.Exists(searchPath))
     {
-        string[] files = new string[] { searchPath };
-        string[] empty = new string[] { };
-        if (modPath.EndsWith(".gml"))
+        if (!Regex.IsMatch(searchPath, @"\.(gml)|(asm)$"))
         {
-            gmlFiles = files;
-            asmFiles = empty;
+            throw new Exception($"File \"{searchPath}\" is not a .gml or .asm file");
         }
-        else if (modPath.EndsWith(".asm"))
-        {
-            gmlFiles = empty;
-            asmFiles = files;
-        }
-        else
-        {
-            throw new Exception($"Mod path \"{searchPath}\" is not a .gml or .asm file");
-        }
+        allFiles = new string[] { searchPath };
     }
     else if (Directory.Exists(searchPath))
     {
-        gmlFiles = Directory.GetFiles(searchPath, "*.gml", SearchOption.AllDirectories);
-        asmFiles = Directory.GetFiles(searchPath, "*.asm", SearchOption.AllDirectories);
+        string[] searchPatterns = new[] { "*.gml", "*.asm" };
+        allFiles = searchPatterns.SelectMany(pattern => Directory.GetFiles(searchPath, pattern, SearchOption.AllDirectories)).ToArray();
     }
     else
     {
@@ -95,16 +84,35 @@ void UMPLoad
     List<UMPCodeEntry> patches = new();
     Dictionary<string, string> functionNames = new();
 
+    Dictionary<string, string> unprocessedCode = new();
     Dictionary<string, string> processedCode = new();
 
-    foreach (string file in asmFiles)
+    List<string> symbolList = symbols?.ToList() ?? new List<string>();
+
+    // get all symbols
+    foreach (string file in allFiles)
     {
-        processedCode[file] = GetDisassemblyText(file);
+        MatchCollection foundSymbols = Regex.Matches(File.ReadAllText(file), @"(?<=^#define\s+)[\w\d_]+", RegexOptions.Multiline);
+        symbolList.AddRange(foundSymbols.Cast<Match>().Select(m => m.Value).ToList());
+        
+        Regex definePattern = new Regex(@"^#define\s+[\w\d_]+\s*$", RegexOptions.Multiline);
+        unprocessedCode[file] = definePattern.Replace(File.ReadAllText(file), "");        
     }
 
-    foreach (string file in gmlFiles)
+    foreach (string symbol in symbolList)
+    {
+        Console.WriteLine(symbol);
+    }
+
+    // code preprocessing
+    foreach (string file in unprocessedCode.Keys)
     {
         string code = File.ReadAllText(file);
+        if (file.EndsWith(".asm"))
+        {
+        }
+        else
+        {
 
         // for enums
         Regex enumPattern = new Regex(@"#[\w\d_]+\.[\w\d_]+");
@@ -124,6 +132,7 @@ void UMPLoad
             }
             return enumValues[enumName][enumMember].ToString();
         });
+        }
     
         processedCode[file] = code;
     }
