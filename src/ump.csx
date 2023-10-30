@@ -130,6 +130,7 @@ void UMPLoad
 
     List<UMPFunctionEntry> functions = new();
     List<UMPCodeEntry> imports = new();
+    List<UMPCodeEntry> patches = new();
     Dictionary<string, string> functionNames = new();
 
     Dictionary<string, string> processedCode = new();
@@ -259,14 +260,14 @@ void UMPLoad
             // skip this file
             continue;
         }
-        else if (code.StartsWith("/// IMPORT"))
+        else if (Regex.IsMatch(code, @"^/// (IMPORT|PATCH)"))
         {
-            string importArg = Regex.Match(code, @"(?<=^///\s*IMPORT[^\S\r\n]*)[\d\w_]+").Value.Trim();
+            string commandArg = Regex.Match(code, @"(?<=^///\s*(IMPORT|PATCH)[^\S\r\n]*)[\d\w_]+").Value.Trim();
             string fileName = "";
             string codeName = "";
-            if (importArg != "" && importArg != ".ignore")
+            if (commandArg != "" && commandArg != ".ignore")
             {
-                fileName = importArg;
+                fileName = commandArg;
             }
             else
             {
@@ -295,11 +296,15 @@ void UMPLoad
                 }
             }
 
-            imports.Add(new UMPCodeEntry(codeName, code, isASM));
+            UMPCodeEntry codeEntry = new UMPCodeEntry(codeName, code, isASM);
+            if (code.StartsWith("/// PATCH"))
+            {
+                patches.Add(codeEntry);
         }
-        else if (code.StartsWith("/// PATCH"))
+            else
         {
-
+                imports.Add(codeEntry);
+            }
         }
         
         if (file.Contains("gml_GlobalScript") || file.Contains("gml_Script"))
@@ -363,6 +368,65 @@ void UMPLoad
             ImportGMLString(entry.Name, entry.Code);
         }
     }
+
+    foreach (UMPCodeEntry entry in patches)
+    {
+        UMPPatchFile patch = new UMPPatchFile(entry.Code, entry.Name, entry.isASM);
+        if (patch.RequiresCompilation)
+        {
+            UMPAddCodeToPatch(patch, entry.Name);
+        }
+
+        foreach (UMPPatchCommand command in patch.Commands)
+        {
+            if (command is UMPAfterCommand)
+            {
+                int placeIndex = patch.Code.IndexOf(command.OriginalCode) + command.OriginalCode.Length;
+                patch.Code = patch.Code.Insert(placeIndex, "\n" + command.NewCode + "\n");
+            }
+            else if (command is UMPBeforeCommand)
+            {
+                int placeIndex = patch.Code.IndexOf(command.OriginalCode);
+                patch.Code = patch.Code.Insert(placeIndex, "\n" + command.NewCode + "\n");
+            }
+            else if (command is UMPReplaceCommand)
+            {
+                patch.Code = patch.Code.Replace(command.OriginalCode, command.NewCode);
+            }
+            else if (command is UMPAppendCommand)
+            {
+                if (entry.isASM)
+                {
+                    patch.Code = patch.Code + "\n" + command.NewCode;
+                }
+                else
+                {
+                    UMPAppendGML(entry.Name, command.NewCode);
+                if (patch.RequiresCompilation)
+                {
+                        UMPAddCodeToPatch(patch, entry.Name);
+                    }
+                }
+            }
+            else if (command is UMPPrependCommand)
+            {
+                patch.Code = command.NewCode + "\n" + patch.Code;
+            }
+            else
+            {
+                throw new Exception("Unknown command type: " + command.GetType().Name);
+            }
+            
+            if (patch.IsASM)
+            {
+                ImportASMString(entry.Name, patch.Code);
+            }            
+            else if (patch.RequiresCompilation)
+            {
+                Data.Code.ByName(entry.Name).ReplaceGML(patch.Code, Data);
+            }
+        }
+    }
 }
 
 
@@ -398,72 +462,11 @@ void UMPImportGML (string codeName, string code)
 {
     codeName = UMPPrefixEntryName(codeName);
     
-    if (UMPHasCommand(code, "USE ENUM"))
-    {
-        string enumsDeclaration = Regex.Match(code, @"(?<=USE ENUM).*$", RegexOptions.Multiline).Value.Trim();
-        string[] enums = enumsDeclaration.Split(',').Select(s => s.Trim()).ToArray();
-        foreach (string enumName in enums)
-        {
-            if (!UMP_ENUM_IMPORTER.Enums.ContainsKey(enumName))
-            {
-                Console.WriteLine(UMP_ENUM_IMPORTER.Enums.Keys);
-                throw new Exception($"Enum \"{enumName}\" not found in enum file");
-            }
-            foreach (string enumMember in UMP_ENUM_IMPORTER.Enums[enumName].Keys)
-            {
-                code = Regex.Replace(code, @$"\b{enumName}.{enumMember}\b", UMP_ENUM_IMPORTER.Enums[enumName][enumMember].ToString());
-            }
-        }
-    }
-
     var isPatchFile = UMPHasCommand(code, "PATCH") && UMPCheckIfCodeExists(codeName);
 
     if (isPatchFile)
     {
-        UMPPatchFile patch = new UMPPatchFile(code, codeName);
-        if (patch.RequiresCompilation)
-        {
-            UMPAddCodeToPatch(patch, codeName);
-        }
 
-        foreach (UMPPatchCommand command in patch.Commands)
-        {
-            if (command is UMPAfterCommand)
-            {
-                int placeIndex = patch.Code.IndexOf(command.OriginalCode) + command.OriginalCode.Length;
-                patch.Code = patch.Code.Insert(placeIndex, "\n" + command.NewCode + "\n");
-            }
-            else if (command is UMPBeforeCommand)
-            {
-                int placeIndex = patch.Code.IndexOf(command.OriginalCode);
-                patch.Code = patch.Code.Insert(placeIndex, "\n" + command.NewCode + "\n");
-            }
-            else if (command is UMPReplaceCommand)
-            {
-                patch.Code = patch.Code.Replace(command.OriginalCode, command.NewCode);
-            }
-            else if (command is UMPAppendCommand)
-            {
-                UMPAppendGML(codeName, command.NewCode);
-                if (patch.RequiresCompilation)
-                {
-                    UMPAddCodeToPatch(patch, codeName);
-                }
-            }
-            else if (command is UMPPrependCommand)
-            {
-                patch.Code = command.NewCode + "\n" + patch.Code;
-            }
-            else
-            {
-                throw new Exception("Unknown command type: " + command.GetType().Name);
-            }
-            
-            if (patch.RequiresCompilation)
-            {
-                Data.Code.ByName(codeName).ReplaceGML(patch.Code, Data);
-            }
-        }
 
     }
     else
@@ -479,8 +482,17 @@ void UMPImportGML (string codeName, string code)
 /// <param name="codeName"></param>
 void UMPAddCodeToPatch (UMPPatchFile patch, string codeName)
 {
-    if (Data.KnownSubFunctions is null) Decompiler.BuildSubFunctionCache(Data);
+    if (patch.IsASM)
+    {
+        patch.Code = GetDisassemblyText(codeName);
+    }
+    else
+    {
+        // to-do: use built in get decompiled text method
+        if (Data.KnownSubFunctions is null) Decompiler.
+        BuildSubFunctionCache(Data);
     patch.Code = Decompiler.Decompile(Data.Code.ByName(codeName), UMP_DECOMPILE_CONTEXT.Value);
+    }
 }
 
 /// <summary>
@@ -596,8 +608,11 @@ class UMPPatchFile
     /// </summary>
     public string Code { get; set ; }
 
-    public UMPPatchFile (string gmlCode, string entryName)
+    public bool IsASM { get; set; }
+
+    public UMPPatchFile (string gmlCode, string entryName, bool isASM)
     {
+        IsASM = isASM;
         gmlCode = gmlCode.Substring(gmlCode.IndexOf('\n') + 1);
         string[] patchLines = gmlCode.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None);
 
@@ -687,7 +702,7 @@ class UMPPatchFile
 
         foreach (UMPPatchCommand command in Commands)
         {
-            if (command.RequiresCompilation)
+            if (isASM || command.RequiresCompilation)
             {
                 RequiresCompilation = true;
                 break;
@@ -728,7 +743,9 @@ class UMPCodeEntry
     public string Name { get; set; }
     public string Code { get; set; }
 
-    public UMPCodeEntry (string name, string code)
+    public bool isASM { get; set; }
+
+    public UMPCodeEntry (string name, string code, bool isASM = false)
     {
         Name = name;
         Code = code;
