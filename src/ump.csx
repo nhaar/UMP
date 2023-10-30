@@ -104,10 +104,25 @@ void UMPLoad
         Console.WriteLine(symbol);
     }
 
-    // code preprocessing
+    // code processing
     foreach (string file in unprocessedCode.Keys)
     {
         string code = File.ReadAllText(file);
+        MatchCollection ifSymbol = Regex.Matches(code, @"(?<=^#if\s+)[\w\d_]+", RegexOptions.Multiline);
+        foreach (Match match in ifSymbol)
+        {
+            Console.WriteLine(match.Value);
+            if (!symbolList.Contains(match.Value))
+            {
+                code = Regex.Replace(code, @$"#if\s+{match.Value}[\s\S]*?#endif$", "");
+            }
+            else
+            {
+                code = Regex.Replace(code, @$"^#if\s+{match.Value}\s*$", "", RegexOptions.Multiline);
+            }
+        }
+        code = Regex.Replace(code, @"#endif", "");
+
         if (file.EndsWith(".asm"))
         {
         }
