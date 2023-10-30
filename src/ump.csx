@@ -95,7 +95,7 @@ Dictionary<string, string> UMPLoad
         MatchCollection foundSymbols = Regex.Matches(File.ReadAllText(file), @"(?<=^#define\s+)[\w\d_]+", RegexOptions.Multiline);
         symbolList.AddRange(foundSymbols.Cast<Match>().Select(m => m.Value).ToList());
         
-        Regex definePattern = new Regex(@"^#define\s+[\w\d_]+\s*$", RegexOptions.Multiline);
+        Regex definePattern = new Regex(@"#define\s+[\w\d_]+\s*?\n");
         unprocessedCode[file] = definePattern.Replace(File.ReadAllText(file), "");        
     }
 
@@ -119,7 +119,7 @@ Dictionary<string, string> UMPLoad
             }
             else
             {
-                code = Regex.Replace(code, @$"^#if\s+{match.Value}\s*$", "", RegexOptions.Multiline);
+                code = Regex.Replace(code, @$"#if\s+{match.Value}\s*?\n", "");
             }
         }
         code = Regex.Replace(code, @"#endif", "");
@@ -134,7 +134,7 @@ Dictionary<string, string> UMPLoad
                 string codeBlock = Regex.Match(match.Value, @"(?<=#code\s+[\w\d_]+\s*(\n|\r\n))[\s\S]*?(?=#endcode)").Value;
                 exportedCode[codeName] = codeBlock;
             }
-            code = code.Replace(@"#code\s+[\w\d_]+", "");
+            code = Regex.Replace(code, @"#code\s+[\w\d_]+\s*?\n", "");
             code = code.Replace(@"#endcode", "");
 
         // for enums
