@@ -102,9 +102,6 @@ void UMPLoad
     }
 
     if (convertCase)
-        {
-            bool caseConverter = (bool)UMP_CONFIG["case-converter"];
-            if (caseConverter)
             {
             if (enumNameCase != UMPCaseConverter.NameCase.PascalCase)
                 {
@@ -127,7 +124,6 @@ void UMPLoad
                         newMembers.Add(newMemberName, enumValues[enumName][enumMember]);
                         }
                     enumValues[enumName] = newMembers;
-                    }
         }
     }
     }
