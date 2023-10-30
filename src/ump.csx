@@ -3,9 +3,6 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using System.Linq;
 
-// used for decompiling
-ThreadLocal<GlobalDecompileContext> UMP_DECOMPILE_CONTEXT = new ThreadLocal<GlobalDecompileContext>(() => new GlobalDecompileContext(Data, false));
-
 // the path to the MAIN script (not this one)
 string UMP_SCRIPT_DIR = Path.GetDirectoryName(ScriptPath);
 
@@ -488,10 +485,7 @@ void UMPAddCodeToPatch (UMPPatchFile patch, string codeName)
     }
     else
     {
-        // to-do: use built in get decompiled text method
-        if (Data.KnownSubFunctions is null) Decompiler.
-        BuildSubFunctionCache(Data);
-    patch.Code = Decompiler.Decompile(Data.Code.ByName(codeName), UMP_DECOMPILE_CONTEXT.Value);
+        patch.Code = GetDecompiledText(codeName);
     }
 }
 
