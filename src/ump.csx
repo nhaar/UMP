@@ -109,7 +109,7 @@ void UMPMain ()
         string code = File.ReadAllText(file);
     
         // ignoring files
-        if (UMPHasCommand(code, "IGNORE"))
+        if (Regex.IsMatch(code, @"^///.*?\.ignore"))
             continue;
         // "opening" function files
         else if (UMPHasCommand(code, "FUNCTIONS"))
