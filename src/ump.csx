@@ -92,6 +92,34 @@ void UMPLoad (Type[] enums, bool convertCase = false, UMPCaseConverter.NameCase 
     List<UMPCodeEntry> nonFunctions = new();
     Dictionary<string, string> functionNames = new();
 
+    Dictionary<string, string> processedCode = new();
+
+    foreach (string file in UMP_MOD_FILES)
+    {
+        string code = File.ReadAllText(file);
+
+        // for enums
+        Regex enumPattern = new Regex(@"#[\w\d_]+\.[\w\d_]+");
+        code = enumPattern.Replace(code, match =>
+        {
+            string value = match.Value;
+            string[] names = value.Split('.');
+            string enumName = names[0].Substring(1);
+            string enumMember = names[1];
+            if (!enumValues.ContainsKey(enumName))
+            {
+                throw new Exception($"Enum \"{enumName}\" not found in enum file");
+            }
+            if (!enumValues[enumName].ContainsKey(enumMember))
+            {
+                throw new Exception($"Enum member \"{enumMember}\" not found in enum \"{enumName}\"");
+            }
+            return enumValues[enumName][enumMember].ToString();
+        });
+    
+        processedCode[Path.GetFileName(file)] = code;
+    }
+
     // first check: function separation and object creation
     foreach (string file in UMP_MOD_FILES)
     {
