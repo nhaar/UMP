@@ -129,7 +129,7 @@ void UMPLoad
     }
 
     List<UMPFunctionEntry> functions = new();
-    List<UMPCodeEntry> nonFunctions = new();
+    List<UMPCodeEntry> imports = new();
     Dictionary<string, string> functionNames = new();
 
     Dictionary<string, string> processedCode = new();
@@ -162,7 +162,7 @@ void UMPLoad
             return enumValues[enumName][enumMember].ToString();
         });
     
-        processedCode[Path.GetFileName(file)] = code;
+        processedCode[file] = code;
     }
 
     // first check: function separation and object creation
@@ -261,7 +261,7 @@ void UMPLoad
         }
         else if (code.StartsWith("/// IMPORT"))
         {
-            string importArg = Regex.Match(code, @"(?<=^///\s*IMPORT\s*)[\d\w_]+").Value.Trim();
+            string importArg = Regex.Match(code, @"(?<=^///\s*IMPORT[^\S\r\n]*)[\d\w_]+").Value.Trim();
             string fileName = "";
             string codeName = "";
             if (importArg != "" && importArg != ".ignore")
@@ -295,14 +295,7 @@ void UMPLoad
                 }
             }
 
-            if (isASM)
-            {
-                ImportASMString(codeName, code);
-            }
-            else
-            {
-                ImportGMLString(codeName, code);
-            }
+            imports.Add(new UMPCodeEntry(codeName, code, isASM));
         }
         else if (code.StartsWith("/// PATCH"))
         {
@@ -318,23 +311,7 @@ void UMPLoad
         }
         else
         {
-            string entryName = Path.GetFileNameWithoutExtension(file);
-            nonFunctions.Add(new UMPCodeEntry(UMPPrefixEntryName(entryName), code));
-        }
-    }
-
-
-    // creating new objects
-    foreach (UMPCodeEntry entry in nonFunctions)
-    {
-        // extract name from event ending in number or with collision which can not end in a number
-        string objName = UMPGetObjectName(entry.Name);
-        if (objName != "")
-        {
-            if (Data.GameObjects.ByName(objName) == null)
-            {
-                UMPCreateGMSObject(objName);
-            }
+            // nonFunctions.Add(new UMPCodeEntry(UMPPrefixEntryName(entryName), code));
         }
     }
 
@@ -370,9 +347,21 @@ void UMPLoad
     {
         UMPImportGML(functionEntry.Name, functionEntry.Code);
     }
-    foreach (UMPCodeEntry entry in nonFunctions)
+    // foreach (UMPCodeEntry entry in nonFunctions)
+    // {
+        // UMPImportGML(entry.Name, entry.Code);
+    // }
+
+    foreach (UMPCodeEntry entry in imports)
     {
-        UMPImportGML(entry.Name, entry.Code);
+        if (entry.isASM)
+        {
+            ImportASMString(entry.Name, entry.Code);
+        }
+        else
+        {
+            ImportGMLString(entry.Name, entry.Code);
+        }
     }
 }
 
