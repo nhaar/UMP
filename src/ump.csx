@@ -41,42 +41,42 @@ Dictionary<string, string> UMPLoad
     Dictionary<string, Dictionary<string, int>> enumValues = new();
     if (enums != null)
     {
-    foreach (Type enumType in enums)
-    {
-        Dictionary<string, int> values = new();
-        foreach (string name in Enum.GetNames(enumType))
+        foreach (Type enumType in enums)
         {
-            values.Add(name, (int)Enum.Parse(enumType, name));
-        }
-        enumValues.Add(enumType.Name, values);
+            Dictionary<string, int> values = new();
+            foreach (string name in Enum.GetNames(enumType))
+            {
+                values.Add(name, (int)Enum.Parse(enumType, name));
+            }
+            enumValues.Add(enumType.Name, values);
         }
     }
 
     if (convertCase)
+    {
+        if (enumNameCase != UMPCaseConverter.NameCase.PascalCase)
+        {
+            string[] keys = enumValues.Keys.ToArray();
+            foreach (string enumName in keys)
             {
-            if (enumNameCase != UMPCaseConverter.NameCase.PascalCase)
-                {
-                string[] keys = enumValues.Keys.ToArray();
-                    foreach (string enumName in keys)
-                    {
-                        string newName = UMPCaseConverter.Convert(enumNameCase, enumName);
-                    enumValues.Add(newName, enumValues[enumName]);
-                    enumValues.Remove(enumName);
-                    }
-                }
-            if (enumMemberCase != UMPCaseConverter.NameCase.PascalCase)
-            {
-                foreach (string enumName in enumValues.Keys)
-                    {
-                        Dictionary<string, int> newMembers = new();
-                    foreach (string enumMember in enumValues[enumName].Keys)
-                        {
-                            string newMemberName = UMPCaseConverter.Convert(enumMemberCase, enumMember);
-                        newMembers.Add(newMemberName, enumValues[enumName][enumMember]);
-                        }
-                    enumValues[enumName] = newMembers;
+                string newName = UMPCaseConverter.Convert(enumNameCase, enumName);
+                enumValues.Add(newName, enumValues[enumName]);
+                enumValues.Remove(enumName);
+            }
         }
-    }
+        if (enumMemberCase != UMPCaseConverter.NameCase.PascalCase)
+        {
+            foreach (string enumName in enumValues.Keys)
+            {
+                Dictionary<string, int> newMembers = new();
+                foreach (string enumMember in enumValues[enumName].Keys)
+                {
+                    string newMemberName = UMPCaseConverter.Convert(enumMemberCase, enumMember);
+                    newMembers.Add(newMemberName, enumValues[enumName][enumMember]);
+                }
+                enumValues[enumName] = newMembers;
+            }
+        }
     }
 
     List<UMPFunctionEntry> functions = new();
@@ -137,26 +137,26 @@ Dictionary<string, string> UMPLoad
             code = Regex.Replace(code, @"#code\s+[\w\d_]+\s*?\n", "");
             code = code.Replace(@"#endcode", "");
 
-        // for enums
-        Regex enumPattern = new Regex(@"#[\w\d_]+\.[\w\d_]+");
-        code = enumPattern.Replace(code, match =>
-        {
-            string value = match.Value;
-            string[] names = value.Split('.');
-            string enumName = names[0].Substring(1);
-            string enumMember = names[1];
-            if (!enumValues.ContainsKey(enumName))
+            // for enums
+            Regex enumPattern = new Regex(@"#[\w\d_]+\.[\w\d_]+");
+            code = enumPattern.Replace(code, match =>
             {
-                throw new Exception($"Enum \"{enumName}\" not found in enum file");
-            }
-            if (!enumValues[enumName].ContainsKey(enumMember))
-            {
-                throw new Exception($"Enum member \"{enumMember}\" not found in enum \"{enumName}\"");
-            }
-            return enumValues[enumName][enumMember].ToString();
-        });
+                string value = match.Value;
+                string[] names = value.Split('.');
+                string enumName = names[0].Substring(1);
+                string enumMember = names[1];
+                if (!enumValues.ContainsKey(enumName))
+                {
+                    throw new Exception($"Enum \"{enumName}\" not found in enum file");
+                }
+                if (!enumValues[enumName].ContainsKey(enumMember))
+                {
+                    throw new Exception($"Enum member \"{enumMember}\" not found in enum \"{enumName}\"");
+                }
+                return enumValues[enumName][enumMember].ToString();
+            });
         }
-    
+
         processedCode[file] = code;
     }
 
@@ -291,18 +291,18 @@ Dictionary<string, string> UMPLoad
             if (code.StartsWith("/// PATCH"))
             {
                 patches.Add(codeEntry);
-        }
+            }
             else
-        {
+            {
                 if (codeName.Contains("gml_GlobalScript") || codeName.Contains("gml_Script"))
-        {
-            string entryName = Path.GetFileNameWithoutExtension(file);
-            string functionName = Regex.Match(entryName, @"(?<=(gml_Script_|gml_GlobalScript_))[_\d\w]+").Value;
+                {
+                    string entryName = Path.GetFileNameWithoutExtension(file);
+                    string functionName = Regex.Match(entryName, @"(?<=(gml_Script_|gml_GlobalScript_))[_\d\w]+").Value;
 
                     functions.Add(new UMPFunctionEntry(entryName, code, functionName, isASM));
-        }
-        else
-        {
+                }
+                else
+                {
                     imports.Add(codeEntry);
                 }
             }
@@ -380,8 +380,8 @@ Dictionary<string, string> UMPLoad
                 else
                 {
                     UMPAppendGML(entry.Name, command.NewCode);
-                if (patch.RequiresCompilation)
-                {
+                    if (patch.RequiresCompilation)
+                    {
                         UMPAddCodeToPatch(patch, entry.Name);
                     }
                 }
@@ -394,7 +394,7 @@ Dictionary<string, string> UMPLoad
             {
                 throw new Exception("Unknown command type: " + command.GetType().Name);
             }
-            
+
             if (patch.IsASM)
             {
                 ImportASMString(entry.Name, patch.Code);
@@ -862,4 +862,3 @@ static class UMPCaseConverter
         ScreamingSnakeCase
     }
 }
-
