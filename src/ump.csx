@@ -117,6 +117,36 @@ Dictionary<string, string> UMPLoad
         symbolList.AddRange(foundSymbols.Cast<Match>().Select(m => m.Value).ToList());
         
         Regex definePattern = new Regex(@"#define\s+[\w\d_]+\s*?\n");
+
+        // check if need to create objects
+        // needs to be done here otherwise
+        // calling the obj names in scripts will not work
+        string codeName = Path.GetFileNameWithoutExtension(file);
+        bool isObject = codeName.StartsWith("gml_Object_");
+        if (!isObject)
+        {
+            foreach (string prefix in objectPrefixes ?? new string[0])
+            {
+                if (codeName.StartsWith(prefix))
+                {
+                    isObject = true;
+                    break;
+                }
+            }
+        }
+
+        if (isObject)
+        {
+            string objName = UMPGetObjectName(codeName);
+
+            if (objName != "")
+            {
+                if (Data.GameObjects.ByName(objName) == null)
+                {
+                    UMPCreateGMSObject(objName);
+                }
+            }
+        }
         unprocessedCode[file] = definePattern.Replace(code, "");        
     }
 
@@ -281,15 +311,6 @@ Dictionary<string, string> UMPLoad
                 fileName = file;
             }
             codeName = Path.GetFileNameWithoutExtension(fileName);
-
-            string objName = UMPGetObjectName(codeName);
-            if (objName != "")
-            {
-                if (Data.GameObjects.ByName(objName) == null)
-                {
-                    UMPCreateGMSObject(objName);
-                }
-            }
 
             bool isASM = fileName.EndsWith(".asm");
             if (objectPrefixes != null)
