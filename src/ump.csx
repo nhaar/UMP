@@ -33,7 +33,6 @@ string[] UMP_MOD_FILES = Directory.GetFiles(Path.Combine(UMP_SCRIPT_DIR, UMP_MOD
 // exceptions need to be logged if the file is being loaded, otherwise UTMT crashes
 try
 {
-    UMPMain();
 }
 catch (Exception e)
 {
@@ -45,58 +44,48 @@ catch (Exception e)
 /// <summary>
 /// The main function of the script
 /// </summary>
-void UMPMain ()
+void UMPLoad (Type[] enums, bool convertCase = false, UMPCaseConverter.NameCase enumNameCase = UMPCaseConverter.NameCase.PascalCase, UMPCaseConverter.NameCase enumMemberCase = UMPCaseConverter.NameCase.PascalCase)
 {
-    try
+    Dictionary<string, Dictionary<string, int>> enumValues = new();
+    foreach (Type enumType in enums)
     {
-        string enumFile = UMP_CONFIG["enum-file"] as string;
-        UMP_ENUM_IMPORTER = new UMPEnumImporter(File.ReadAllText(Path.Combine(UMP_SCRIPT_DIR, enumFile)));
+        Dictionary<string, int> values = new();
+        foreach (string name in Enum.GetNames(enumType))
+        {
+            values.Add(name, (int)Enum.Parse(enumType, name));
+        }
+        enumValues.Add(enumType.Name, values);
+    }
 
-        // converting enum cases if enabled
-        try
+    if (convertCase)
         {
             bool caseConverter = (bool)UMP_CONFIG["case-converter"];
             if (caseConverter)
             {
-                try
+            if (enumNameCase != UMPCaseConverter.NameCase.PascalCase)
                 {
-                    UMPCaseConverter.NameCase enumNameCase = UMPCaseConverter.CaseFromString(UMP_CONFIG["enum-name-case"] as string);
-                    string[] keys = UMP_ENUM_IMPORTER.Enums.Keys.ToArray();
+                string[] keys = enumValues.Keys.ToArray();
                     foreach (string enumName in keys)
                     {
                         string newName = UMPCaseConverter.Convert(enumNameCase, enumName);
-                        UMP_ENUM_IMPORTER.Enums.Add(newName, UMP_ENUM_IMPORTER.Enums[enumName]);
-                        UMP_ENUM_IMPORTER.Enums.Remove(enumName);
+                    enumValues.Add(newName, enumValues[enumName]);
+                    enumValues.Remove(enumName);
                     }
                 }
-                catch (Exception)
-                {                
-                }
-                try
-                {
-                    UMPCaseConverter.NameCase enumMemberCase = UMPCaseConverter.CaseFromString(UMP_CONFIG["enum-member-case"] as string);
-                    foreach (string enumName in UMP_ENUM_IMPORTER.Enums.Keys)
+            if (enumMemberCase != UMPCaseConverter.NameCase.PascalCase)
+            {
+                foreach (string enumName in enumValues.Keys)
                     {
                         Dictionary<string, int> newMembers = new();
-                        foreach (string enumMember in UMP_ENUM_IMPORTER.Enums[enumName].Keys)
+                    foreach (string enumMember in enumValues[enumName].Keys)
                         {
                             string newMemberName = UMPCaseConverter.Convert(enumMemberCase, enumMember);
-                            newMembers.Add(newMemberName, UMP_ENUM_IMPORTER.Enums[enumName][enumMember]);
+                        newMembers.Add(newMemberName, enumValues[enumName][enumMember]);
                         }
-                        UMP_ENUM_IMPORTER.Enums[enumName] = newMembers;
+                    enumValues[enumName] = newMembers;
                     }
-                }
-                catch (Exception)
-                {
-                }
-            }
-        }
-        catch (Exception)
-        {        
         }
     }
-    catch (Exception)
-    {
     }
 
     List<UMPFunctionEntry> functions = new();
