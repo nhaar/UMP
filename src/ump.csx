@@ -44,9 +44,23 @@ catch (Exception e)
 /// <summary>
 /// The main function of the script
 /// </summary>
-void UMPLoad (Type[] enums, bool convertCase = false, UMPCaseConverter.NameCase enumNameCase = UMPCaseConverter.NameCase.PascalCase, UMPCaseConverter.NameCase enumMemberCase = UMPCaseConverter.NameCase.PascalCase)
+void UMPLoad
+(
+    string modDir = "",
+    Type[] enums = null,
+    bool convertCase = false,
+    UMPCaseConverter.NameCase enumNameCase = UMPCaseConverter.NameCase.PascalCase,
+    UMPCaseConverter.NameCase enumMemberCase = UMPCaseConverter.NameCase.PascalCase,
+    string[] objectPrefixes = null
+)
 {
+    string seachDir = Path.Combine(Path.GetDirectoryName(ScriptPath), modDir);
+    string[] gmlFiles = Directory.GetFiles(seachDir, "*.gml", SearchOption.AllDirectories);
+    string[] asmFiles = Directory.GetFiles(seachDir, "*.asm", SearchOption.AllDirectories);
+
     Dictionary<string, Dictionary<string, int>> enumValues = new();
+    if (enums != null)
+    {
     foreach (Type enumType in enums)
     {
         Dictionary<string, int> values = new();
@@ -55,6 +69,7 @@ void UMPLoad (Type[] enums, bool convertCase = false, UMPCaseConverter.NameCase 
             values.Add(name, (int)Enum.Parse(enumType, name));
         }
         enumValues.Add(enumType.Name, values);
+        }
     }
 
     if (convertCase)
@@ -94,7 +109,12 @@ void UMPLoad (Type[] enums, bool convertCase = false, UMPCaseConverter.NameCase 
 
     Dictionary<string, string> processedCode = new();
 
-    foreach (string file in UMP_MOD_FILES)
+    foreach (string file in asmFiles)
+    {
+        processedCode[file] = GetDisassemblyText(file);
+    }
+
+    foreach (string file in gmlFiles)
     {
         string code = File.ReadAllText(file);
 
@@ -121,17 +141,16 @@ void UMPLoad (Type[] enums, bool convertCase = false, UMPCaseConverter.NameCase 
     }
 
     // first check: function separation and object creation
-    foreach (string file in UMP_MOD_FILES)
+    foreach (string file in processedCode.Keys)
     {
-        string code = File.ReadAllText(file);
+        string code = processedCode[file];
     
         // ignoring files
         if (Regex.IsMatch(code, @"^///.*?\.ignore"))
             continue;
         // "opening" function files
-        else if (UMPHasCommand(code, "FUNCTIONS"))
+        else if (code.StartsWith("/// FUNCTIONS"))
         {
-            string enumsDeclaration = Regex.Match(code, @"/// USE ENUM.*$", RegexOptions.Multiline).Value.Trim();
             string currentFunction = "";
             int i = 0;
             int start = 0;
@@ -204,7 +223,7 @@ void UMPLoad (Type[] enums, bool convertCase = false, UMPCaseConverter.NameCase 
                                 functionCodeBlock = $"var {arg} = argument{j};" + functionCodeBlock;
                             }
                         }
-                        functionCodeBlock = $"{enumsDeclaration}\nfunction {functionName}({string.Join(", ", gmlArgs)}) {{ {functionCodeBlock} }}";
+                        functionCodeBlock = $"function {functionName}({string.Join(", ", gmlArgs)}) {{ {functionCodeBlock} }}";
                         string entryName = $"gml_GlobalScript_{functionName}";
                         functions.Add(new UMPFunctionEntry(entryName, functionCodeBlock, functionName));
                     }
@@ -214,6 +233,55 @@ void UMPLoad (Type[] enums, bool convertCase = false, UMPCaseConverter.NameCase 
 
             // skip this file
             continue;
+        }
+        else if (code.StartsWith("/// IMPORT"))
+        {
+            string importArg = Regex.Match(code, @"(?<=^///\s*IMPORT\s*)[\d\w_]+").Value.Trim();
+            string fileName = "";
+            string codeName = "";
+            if (importArg != "" && importArg != ".ignore")
+            {
+                fileName = importArg;
+            }
+            else
+            {
+                fileName = file;
+            }
+            codeName = Path.GetFileNameWithoutExtension(fileName);
+
+            string objName = UMPGetObjectName(codeName);
+            if (objName != "")
+            {
+                if (Data.GameObjects.ByName(objName) == null)
+                {
+                    UMPCreateGMSObject(objName);
+                }
+            }
+
+            bool isASM = fileName.EndsWith(".asm");
+            if (objectPrefixes != null)
+            {
+                foreach (string prefix in objectPrefixes)
+                {
+                    if (codeName.StartsWith(prefix))
+                    {
+                        codeName = $"gml_Object_{codeName}";
+                    }
+                }
+            }
+
+            if (isASM)
+            {
+                ImportASMString(codeName, code);
+            }
+            else
+            {
+                ImportGMLString(codeName, code);
+            }
+        }
+        else if (code.StartsWith("/// PATCH"))
+        {
+
         }
         
         if (file.Contains("gml_GlobalScript") || file.Contains("gml_Script"))
