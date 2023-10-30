@@ -213,14 +213,11 @@ void UMPLoad
                         }
                         functionCodeBlock = $"function {functionName}({string.Join(", ", gmlArgs)}) {{ {functionCodeBlock} }}";
                         string entryName = $"gml_GlobalScript_{functionName}";
-                        functions.Add(new UMPFunctionEntry(entryName, functionCodeBlock, functionName));
+                        functions.Add(new UMPFunctionEntry(entryName, functionCodeBlock, functionName, false));
                     }
                 }
                 i++;
             }
-
-            // skip this file
-            continue;
         }
         else if (Regex.IsMatch(code, @"^/// (IMPORT|PATCH)"))
         {
@@ -265,20 +262,18 @@ void UMPLoad
         }
             else
         {
-                imports.Add(codeEntry);
-            }
-        }
-        
-        if (file.Contains("gml_GlobalScript") || file.Contains("gml_Script"))
+                if (codeName.Contains("gml_GlobalScript") || codeName.Contains("gml_Script"))
         {
             string entryName = Path.GetFileNameWithoutExtension(file);
             string functionName = Regex.Match(entryName, @"(?<=(gml_Script_|gml_GlobalScript_))[_\d\w]+").Value;
 
-            functions.Add(new UMPFunctionEntry(entryName, code, functionName));
+                    functions.Add(new UMPFunctionEntry(entryName, code, functionName, isASM));
         }
         else
         {
-            // nonFunctions.Add(new UMPCodeEntry(UMPPrefixEntryName(entryName), code));
+                    imports.Add(codeEntry);
+                }
+            }
         }
     }
 
@@ -310,29 +305,19 @@ void UMPLoad
         }
     }
 
-    foreach (UMPFunctionEntry functionEntry in functionsInOrder)
+    foreach (UMPFunctionEntry entry in functionsInOrder)
     {
+        UMPImportCodeEntry(entry);
     }
-    // foreach (UMPCodeEntry entry in nonFunctions)
-    // {
-        // UMPImportGML(entry.Name, entry.Code);
-    // }
 
     foreach (UMPCodeEntry entry in imports)
     {
-        if (entry.isASM)
-        {
-            ImportASMString(entry.Name, entry.Code);
-        }
-        else
-        {
-            ImportGMLString(entry.Name, entry.Code);
-        }
+        UMPImportCodeEntry(entry);
     }
 
     foreach (UMPCodeEntry entry in patches)
     {
-        UMPPatchFile patch = new UMPPatchFile(entry.Code, entry.Name, entry.isASM);
+        UMPPatchFile patch = new UMPPatchFile(entry.Code, entry.Name, entry.IsASM);
         if (patch.RequiresCompilation)
         {
             UMPAddCodeToPatch(patch, entry.Name);
@@ -356,7 +341,7 @@ void UMPLoad
             }
             else if (command is UMPAppendCommand)
             {
-                if (entry.isASM)
+                if (entry.IsASM)
                 {
                     patch.Code = patch.Code + "\n" + command.NewCode;
                 }
@@ -655,12 +640,13 @@ class UMPCodeEntry
     public string Name { get; set; }
     public string Code { get; set; }
 
-    public bool isASM { get; set; }
+    public bool IsASM { get; set; }
 
     public UMPCodeEntry (string name, string code, bool isASM = false)
     {
         Name = name;
         Code = code;
+        IsASM = isASM;
     }
 
     public override bool Equals(object obj)
@@ -681,7 +667,25 @@ class UMPCodeEntry
         throw new System.NotImplementedException();
         return base.GetHashCode();
     }
+
+    public void Import ()
+    {
+
+    }
 }
+
+void UMPImportCodeEntry (UMPCodeEntry codeEntry)
+{
+    if (codeEntry.IsASM)
+    {
+        ImportASMString(codeEntry.Name, codeEntry.Code);
+    }
+    else
+    {
+        ImportGMLString(codeEntry.Name, codeEntry.Code);
+    }
+}
+
 
 /// <summary>
 /// Represents a code entry that is a function
@@ -690,7 +694,7 @@ class UMPFunctionEntry : UMPCodeEntry
 {
     public string FunctionName { get; set; }
 
-    public UMPFunctionEntry (string name, string code, string functionName) : base(name, code)
+    public UMPFunctionEntry (string name, string code, string functionName, bool isASM) : base(name, code, isASM)
     {
         FunctionName = functionName;
     }
