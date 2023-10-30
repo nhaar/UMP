@@ -8,7 +8,9 @@ using System.Linq;
 /// </summary>
 Dictionary<string, string> UMPLoad
 (
-    string modPath = "",
+    string modPath = null,
+    string codeNameWithExtension = null,
+    string codeString = null,
     Type[] enums = null,
     bool convertCase = false,
     UMPCaseConverter.NameCase enumNameCase = UMPCaseConverter.NameCase.PascalCase,
@@ -18,24 +20,43 @@ Dictionary<string, string> UMPLoad
     string[] symbols = null
 )
 {
-    string[] allFiles = null;
-    string searchPath = Path.Combine(Path.GetDirectoryName(ScriptPath), modPath);
-    if (File.Exists(searchPath))
+    Dictionary<string, string> originalCode = new();
+    if (modPath != null && codeNameWithExtension != null)
     {
-        if (!Regex.IsMatch(searchPath, @"\.(gml)|(asm)$"))
-        {
-            throw new Exception($"File \"{searchPath}\" is not a .gml or .asm file");
-        }
-        allFiles = new string[] { searchPath };
+        throw new Exception("Cannot specify both code via file and via string");
     }
-    else if (Directory.Exists(searchPath))
+    else if (codeNameWithExtension == null)
     {
-        string[] searchPatterns = new[] { "*.gml", "*.asm" };
-        allFiles = searchPatterns.SelectMany(pattern => Directory.GetFiles(searchPath, pattern, SearchOption.AllDirectories)).ToArray();
+        string[] allFiles = null;
+        string searchPath = Path.Combine(Path.GetDirectoryName(ScriptPath), modPath);
+        if (File.Exists(searchPath))
+        {
+            if (!Regex.IsMatch(searchPath, @"\.(gml)|(asm)$"))
+            {
+                throw new Exception($"File \"{searchPath}\" is not a .gml or .asm file");
+            }
+            allFiles = new string[] { searchPath };
+        }
+        else if (Directory.Exists(searchPath))
+        {
+            string[] searchPatterns = new[] { "*.gml", "*.asm" };
+            allFiles = searchPatterns.SelectMany(pattern => Directory.GetFiles(searchPath, pattern, SearchOption.AllDirectories)).ToArray();
+        }
+        else
+        {
+            throw new Exception($"Mod path \"{searchPath}\" does not exist");
+        }
+
+        foreach (string file in allFiles)
+        {
+            string code = File.ReadAllText(file);
+            string codeName = Path.GetFileName(file);
+            originalCode[codeName] = code;
+        }
     }
     else
     {
-        throw new Exception($"Mod path \"{searchPath}\" does not exist");
+        originalCode[codeNameWithExtension] = codeString;
     }
 
     Dictionary<string, Dictionary<string, int>> enumValues = new();
@@ -90,18 +111,14 @@ Dictionary<string, string> UMPLoad
     List<string> symbolList = symbols?.ToList() ?? new List<string>();
 
     // code preprocessing
-    foreach (string file in allFiles)
+    foreach (string file in originalCode.Keys)
     {
-        MatchCollection foundSymbols = Regex.Matches(File.ReadAllText(file), @"(?<=^#define\s+)[\w\d_]+", RegexOptions.Multiline);
+        string code = originalCode[file];
+        MatchCollection foundSymbols = Regex.Matches(code, @"(?<=^#define\s+)[\w\d_]+", RegexOptions.Multiline);
         symbolList.AddRange(foundSymbols.Cast<Match>().Select(m => m.Value).ToList());
         
         Regex definePattern = new Regex(@"#define\s+[\w\d_]+\s*?\n");
-        unprocessedCode[file] = definePattern.Replace(File.ReadAllText(file), "");        
-    }
-
-    foreach (string symbol in symbolList)
-    {
-        Console.WriteLine(symbol);
+        unprocessedCode[file] = definePattern.Replace(code, "");        
     }
 
     Dictionary<string, string> exportedCode = new();
@@ -109,7 +126,7 @@ Dictionary<string, string> UMPLoad
     // code processing
     foreach (string file in unprocessedCode.Keys)
     {
-        string code = File.ReadAllText(file);
+        string code = unprocessedCode[file];
         MatchCollection ifSymbol = Regex.Matches(code, @"(?<=^#if\s+)[\w\d_]+", RegexOptions.Multiline);
         foreach (Match match in ifSymbol)
         {
