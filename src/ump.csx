@@ -50,8 +50,7 @@ Dictionary<string, string> UMPLoad
         foreach (string file in allFiles)
         {
             string code = File.ReadAllText(file);
-            string codeName = Path.GetFileName(file);
-            originalCode[codeName] = code;
+            originalCode[file] = code;
         }
     }
     else
