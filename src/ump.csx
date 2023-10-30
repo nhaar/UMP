@@ -6,7 +6,7 @@ using System.Linq;
 /// <summary>
 /// The main function of the script
 /// </summary>
-void UMPLoad
+Dictionary<string, string> UMPLoad
 (
     string modPath = "",
     Type[] enums = null,
@@ -89,7 +89,7 @@ void UMPLoad
 
     List<string> symbolList = symbols?.ToList() ?? new List<string>();
 
-    // get all symbols
+    // code preprocessing
     foreach (string file in allFiles)
     {
         MatchCollection foundSymbols = Regex.Matches(File.ReadAllText(file), @"(?<=^#define\s+)[\w\d_]+", RegexOptions.Multiline);
@@ -104,6 +104,8 @@ void UMPLoad
         Console.WriteLine(symbol);
     }
 
+    Dictionary<string, string> exportedCode = new();
+
     // code processing
     foreach (string file in unprocessedCode.Keys)
     {
@@ -111,10 +113,9 @@ void UMPLoad
         MatchCollection ifSymbol = Regex.Matches(code, @"(?<=^#if\s+)[\w\d_]+", RegexOptions.Multiline);
         foreach (Match match in ifSymbol)
         {
-            Console.WriteLine(match.Value);
             if (!symbolList.Contains(match.Value))
             {
-                code = Regex.Replace(code, @$"#if\s+{match.Value}[\s\S]*?#endif$", "");
+                code = Regex.Replace(code, @$"#if\s+{match.Value}[\s\S]*?#endif", "");
             }
             else
             {
@@ -123,11 +124,18 @@ void UMPLoad
         }
         code = Regex.Replace(code, @"#endif", "");
 
-        if (file.EndsWith(".asm"))
+        if (file.EndsWith(".gml"))
         {
-        }
-        else
-        {
+            Regex codeBlockPattern = new Regex(@"#code\s+[\w\d_]+\s*(\n|\r\n)[\s\S]*?#endcode");
+            MatchCollection codeBlockMatches = codeBlockPattern.Matches(code);
+            foreach (Match match in codeBlockMatches)
+            {
+                string codeName = Regex.Match(match.Value, @"(?<=#code\s+)[\w\d_]+\s*(\n|\r\n)").Value;
+                string codeBlock = Regex.Match(match.Value, @"(?<=#code\s+[\w\d_]+\s*(\n|\r\n))[\s\S]*?(?=#endcode)").Value;
+                exportedCode[codeName] = codeBlock;
+            }
+            code = code.Replace(@"#code\s+[\w\d_]+", "");
+            code = code.Replace(@"#endcode", "");
 
         // for enums
         Regex enumPattern = new Regex(@"#[\w\d_]+\.[\w\d_]+");
@@ -397,6 +405,8 @@ void UMPLoad
             }
         }
     }
+
+    return exportedCode;
 }
 
 /// <summary>
