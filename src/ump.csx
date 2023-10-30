@@ -46,17 +46,46 @@ catch (Exception e)
 /// </summary>
 void UMPLoad
 (
-    string modDir = "",
+    string modPath = "",
     Type[] enums = null,
     bool convertCase = false,
     UMPCaseConverter.NameCase enumNameCase = UMPCaseConverter.NameCase.PascalCase,
     UMPCaseConverter.NameCase enumMemberCase = UMPCaseConverter.NameCase.PascalCase,
-    string[] objectPrefixes = null
+    string[] objectPrefixes = null,
+    bool useIgnore = true
 )
 {
-    string seachDir = Path.Combine(Path.GetDirectoryName(ScriptPath), modDir);
-    string[] gmlFiles = Directory.GetFiles(seachDir, "*.gml", SearchOption.AllDirectories);
-    string[] asmFiles = Directory.GetFiles(seachDir, "*.asm", SearchOption.AllDirectories);
+    string[] gmlFiles = null;
+    string[] asmFiles = null;
+    string searchPath = Path.Combine(Path.GetDirectoryName(ScriptPath), modPath);
+    if (File.Exists(searchPath))
+    {
+        string[] files = new string[] { searchPath };
+        string[] empty = new string[] { };
+        if (modPath.EndsWith(".gml"))
+        {
+            gmlFiles = files;
+            asmFiles = empty;
+        }
+        else if (modPath.EndsWith(".asm"))
+        {
+            gmlFiles = empty;
+            asmFiles = files;
+        }
+        else
+        {
+            throw new Exception($"Mod path \"{searchPath}\" is not a .gml or .asm file");
+        }
+    }
+    else if (Directory.Exists(searchPath))
+    {
+        gmlFiles = Directory.GetFiles(searchPath, "*.gml", SearchOption.AllDirectories);
+        asmFiles = Directory.GetFiles(searchPath, "*.asm", SearchOption.AllDirectories);
+    }
+    else
+    {
+        throw new Exception($"Mod path \"{searchPath}\" does not exist");
+    }
 
     Dictionary<string, Dictionary<string, int>> enumValues = new();
     if (enums != null)
@@ -146,7 +175,7 @@ void UMPLoad
         string code = processedCode[file];
     
         // ignoring files
-        if (Regex.IsMatch(code, @"^///.*?\.ignore"))
+        if (useIgnore && Regex.IsMatch(code, @"^///.*?\.ignore"))
             continue;
         // "opening" function files
         else if (code.StartsWith("/// FUNCTIONS"))
