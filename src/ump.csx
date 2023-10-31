@@ -129,6 +129,7 @@ Dictionary<string, string> UMPLoad
             {
                 if (codeName.StartsWith(prefix))
                 {
+                    codeName = $"gml_Object_{codeName}";
                     isObject = true;
                     break;
                 }
