@@ -4,8 +4,20 @@ using Newtonsoft.Json;
 using System.Linq;
 
 /// <summary>
-/// The main function of the script
+/// Loads GML or ASM code, through a file or a string, and imports it into the game using the UMP processing options
 /// </summary>
+/// <param name="modPath">If given, will look at all the files inside the directory</param>
+/// <param name="codeNameWithExtension">If given, will import the code with the given name. Extensions .gml and .asm are required</param>
+/// <param name="codeString">If given together with codeNameWithExtension, will be the code content imported</param>
+/// <param name="enums">An array of enum types that will be imported to use in GML</param>
+/// <param name="convertCase">Whether the enum cases should be converted or not</param>
+/// <param name="enumNameCase">If given, will convert the enum names from pascal case to the given case</param>
+/// <param name="enumMemberCase">If given, will convert the enum members from pascal case to the given case</param>
+/// <param name="objectPrefixes">An array of all the object prefixes</param>
+/// <param name="useIgnore">Whether or not .ignore should make a file be ignored or not</param>
+/// <param name="symbols">An array with all pre-defined symbols to give the code</param>
+/// <returns>A dictionary mapping code names to their code</returns>
+/// <exception cref="Exception"></exception>
 Dictionary<string, string> UMPLoad
 (
     string modPath = null,
@@ -23,7 +35,7 @@ Dictionary<string, string> UMPLoad
     Dictionary<string, string> originalCode = new();
     if (modPath != null && codeNameWithExtension != null)
     {
-        throw new Exception("Cannot specify both code via file and via string");
+        Console.WriteLine(new UMPException(1, "Cannot specify both code via file and via string"));
     }
     else if (codeNameWithExtension == null)
     {
@@ -33,7 +45,7 @@ Dictionary<string, string> UMPLoad
         {
             if (!Regex.IsMatch(searchPath, @"\.(gml)|(asm)$"))
             {
-                throw new Exception($"File \"{searchPath}\" is not a .gml or .asm file");
+                Console.WriteLine(new UMPException(2, $"File \"{searchPath}\" is not a .gml or .asm file"));
             }
             allFiles = new string[] { searchPath };
         }
@@ -44,7 +56,7 @@ Dictionary<string, string> UMPLoad
         }
         else
         {
-            throw new Exception($"Mod path \"{searchPath}\" does not exist");
+            Console.WriteLine(new UMPException(3, $"Mod path \"{searchPath}\" does not exist"));
         }
 
         foreach (string file in allFiles)
@@ -55,21 +67,24 @@ Dictionary<string, string> UMPLoad
     }
     else
     {
+        if (codeString == null)
+        {
+            Console.WriteLine(new UMPException(4, "Code string must be given if code name is given"));
+        }
+        if (!Regex.IsMatch(codeNameWithExtension, @"\.(gml)|(asm)$"))
+        {
+            Console.WriteLine(new UMPException(5, $"Code name given without extension or with invalid extension: \"{codeNameWithExtension}\""));
+        }
         originalCode[codeNameWithExtension] = codeString;
     }
 
+    // computing enum related arguments
     Dictionary<string, Dictionary<string, int>> enumValues = new();
-    if (enums != null)
+
+    foreach (Type enumType in enums ?? new Type[0])
     {
-        foreach (Type enumType in enums)
-        {
-            Dictionary<string, int> values = new();
-            foreach (string name in Enum.GetNames(enumType))
-            {
-                values.Add(name, (int)Enum.Parse(enumType, name));
-            }
-            enumValues.Add(enumType.Name, values);
-        }
+        var values = Enum.GetNames(enumType).ToDictionary(name => name, name => (int)Enum.Parse(enumType, name));
+        enumValues[enumType.Name] = values;
     }
 
     if (convertCase)
@@ -86,24 +101,19 @@ Dictionary<string, string> UMPLoad
         }
         if (enumMemberCase != UMPCaseConverter.NameCase.PascalCase)
         {
-            foreach (string enumName in enumValues.Keys)
+            foreach (string enumName in enumValues.Keys.ToList())
             {
-                Dictionary<string, int> newMembers = new();
-                foreach (string enumMember in enumValues[enumName].Keys)
-                {
-                    string newMemberName = UMPCaseConverter.Convert(enumMemberCase, enumMember);
-                    newMembers.Add(newMemberName, enumValues[enumName][enumMember]);
-                }
-                enumValues[enumName] = newMembers;
+                enumValues[enumName] = enumValues[enumName]
+                    .ToDictionary(pair => UMPCaseConverter.Convert(enumMemberCase, pair.Key), pair => pair.Value);
             }
         }
     }
 
+    // storing to be added entries
     List<UMPFunctionEntry> functions = new();
     List<UMPCodeEntry> imports = new();
     List<UMPCodeEntry> patches = new();
-    Dictionary<string, string> functionNames = new();
-
+    
     Dictionary<string, string> unprocessedCode = new();
     Dictionary<string, string> processedCode = new();
 
@@ -112,12 +122,6 @@ Dictionary<string, string> UMPLoad
     // code preprocessing
     foreach (string file in originalCode.Keys)
     {
-        string code = originalCode[file];
-        MatchCollection foundSymbols = Regex.Matches(code, @"(?<=^#define\s+)[\w\d_]+", RegexOptions.Multiline);
-        symbolList.AddRange(foundSymbols.Cast<Match>().Select(m => m.Value).ToList());
-        
-        Regex definePattern = new Regex(@"#define\s+[\w\d_]+\s*?\n");
-
         // check if need to create objects
         // needs to be done here otherwise
         // calling the obj names in scripts will not work
@@ -136,21 +140,21 @@ Dictionary<string, string> UMPLoad
             }
         }
 
-        if (isObject)
+        string objName = UMPGetObjectName(codeName);
+        if (objName != "" && Data.GameObjects.ByName(objName) == null)
         {
-            string objName = UMPGetObjectName(codeName);
-
-            if (objName != "")
-            {
-                if (Data.GameObjects.ByName(objName) == null)
-                {
-                    UMPCreateGMSObject(objName);
-                }
-            }
+            UMPCreateGMSObject(objName);
         }
+
+        // getting symbols and saving code without defines
+        string code = originalCode[file];
+        MatchCollection foundSymbols = Regex.Matches(code, @"(?<=^#define\s+)[\w\d_]+", RegexOptions.Multiline);
+        symbolList.AddRange(foundSymbols.Cast<Match>().Select(m => m.Value).ToList());
+        Regex definePattern = new Regex(@"#define\s+[\w\d_]+\s*?\n");
         unprocessedCode[file] = definePattern.Replace(code, "");        
     }
 
+    // code that will be given back to the user
     Dictionary<string, string> exportedCode = new();
 
     // code processing
@@ -160,20 +164,25 @@ Dictionary<string, string> UMPLoad
         MatchCollection ifSymbol = Regex.Matches(code, @"(?<=^#if\s+)[\w\d_]+", RegexOptions.Multiline);
         foreach (Match match in ifSymbol)
         {
+            // if the symbol is not defined, remove the code
             if (!symbolList.Contains(match.Value))
             {
                 code = Regex.Replace(code, @$"#if\s+{match.Value}[\s\S]*?#endif", "");
             }
+            // remove only #if
             else
             {
                 code = Regex.Replace(code, @$"#if\s+{match.Value}\s*?\n", "");
             }
         }
+
+        // all endifs from defined symbols
         code = Regex.Replace(code, @"#endif", "");
 
         if (file.EndsWith(".gml"))
         {
-            Regex codeBlockPattern = new Regex(@"#code\s+[\w\d_]+\s*(\n|\r\n)[\s\S]*?#endcode");
+            // exporting code blocks with names
+            Regex codeBlockPattern = new Regex(@"#code\s+[\w\d_]+\s*\n[\s\S]*?#endcode");
             MatchCollection codeBlockMatches = codeBlockPattern.Matches(code);
             foreach (Match match in codeBlockMatches)
             {
@@ -181,10 +190,12 @@ Dictionary<string, string> UMPLoad
                 string codeBlock = Regex.Match(match.Value, @"(?<=#code\s+[\w\d_]+\s*(\n|\r\n))[\s\S]*?(?=#endcode)").Value;
                 exportedCode[codeName] = codeBlock;
             }
+
+            // remove code name processing
             code = Regex.Replace(code, @"#code\s+[\w\d_]+\s*?\n", "");
             code = code.Replace(@"#endcode", "");
 
-            // for enums
+            // inserting enums
             Regex enumPattern = new Regex(@"#[\w\d_]+\.[\w\d_]+");
             code = enumPattern.Replace(code, match =>
             {
@@ -194,11 +205,11 @@ Dictionary<string, string> UMPLoad
                 string enumMember = names[1];
                 if (!enumValues.ContainsKey(enumName))
                 {
-                    throw new Exception($"Enum \"{enumName}\" not found in enum file");
+                    Console.WriteLine(new UMPException(7, $"Enum \"{enumName}\" not found in given enums"));
                 }
                 if (!enumValues[enumName].ContainsKey(enumMember))
                 {
-                    throw new Exception($"Enum member \"{enumMember}\" not found in enum \"{enumName}\"");
+                    Console.WriteLine(new UMPException(8, $"Enum member \"{enumMember}\" not found in enum \"{enumName}\""));
                 }
                 return enumValues[enumName][enumMember].ToString();
             });
@@ -207,7 +218,7 @@ Dictionary<string, string> UMPLoad
         processedCode[file] = code;
     }
 
-    // first check: function separation and object creation
+    // post processing (organizing which files to import and how)
     foreach (string file in processedCode.Keys)
     {
         string code = processedCode[file];
@@ -218,6 +229,7 @@ Dictionary<string, string> UMPLoad
         // "opening" function files
         else if (code.StartsWith("/// FUNCTIONS"))
         {
+            // to-do: add errors for invalid syntax
             string currentFunction = "";
             int i = 0;
             int start = 0;
@@ -300,28 +312,16 @@ Dictionary<string, string> UMPLoad
         }
         else if (Regex.IsMatch(code, @"^/// (IMPORT|PATCH)"))
         {
-            string commandArg = Regex.Match(code, @"(?<=^///\s*(IMPORT|PATCH)[^\S\r\n]*)[\d\w_]+").Value.Trim();
-            string fileName = "";
+            string fileName = file;
             string codeName = "";
-            if (commandArg != "" && commandArg != ".ignore")
-            {
-                fileName = commandArg;
-            }
-            else
-            {
-                fileName = file;
-            }
             codeName = Path.GetFileNameWithoutExtension(fileName);
-
             bool isASM = fileName.EndsWith(".asm");
-            if (objectPrefixes != null)
+
+            foreach (string prefix in objectPrefixes ?? new string[0])
             {
-                foreach (string prefix in objectPrefixes)
+                if (codeName.StartsWith(prefix))
                 {
-                    if (codeName.StartsWith(prefix))
-                    {
-                        codeName = $"gml_Object_{codeName}";
-                    }
+                    codeName = $"gml_Object_{codeName}";
                 }
             }
 
@@ -344,6 +344,10 @@ Dictionary<string, string> UMPLoad
                     imports.Add(codeEntry);
                 }
             }
+        }
+        else
+        {
+            Console.WriteLine(new UMPException(9, $"File \"{file}\" does not have a valid UMP type"));
         }
     }
 
@@ -604,7 +608,7 @@ class UMPPatchFile
                         }
                         else
                         {
-                            throw new Exception($"Error in patch file \"{entryName}\": Expected CODE command");
+                            Console.WriteLine(new UMPException(10, $"Error in patch file \"{entryName}\": Expected CODE command"));
                         }
                     }
                     else if (Regex.IsMatch(line, @"\bEND\b"))
@@ -620,7 +624,7 @@ class UMPPatchFile
                     }
                     else
                     {
-                        throw new Exception($"Error in patch file \"{entryName}\": Expected END command");
+                        Console.WriteLine(new UMPException(11, $"Error in patch file \"{entryName}\": Expected END command"));
                     }
                 }
                 else
@@ -796,6 +800,10 @@ static class UMPCaseConverter
     /// <exception cref="Exception">If giving an unsupported case</exception>
     public static string Convert (NameCase nameCase, string name)
     {
+        if (!IsPascalCase(name))
+        {
+            Console.WriteLine(new UMPException(6, $"Original case must be pascal case for name \"{name}\""));
+        }
         switch (nameCase)
         {
             case NameCase.CamelCase:
@@ -807,6 +815,11 @@ static class UMPCaseConverter
             default:
                 throw new Exception($"Unsupported case: {nameCase}");
         }
+    }
+
+    public static bool IsPascalCase(string str)
+    {
+        return Regex.IsMatch(str, @"^[A-Z][a-zA-Z0-9]*$");
     }
 
     /// <summary>
@@ -898,5 +911,31 @@ static class UMPCaseConverter
         /// Case "LIKE_THIS"
         /// </summary>
         ScreamingSnakeCase
+    }
+}
+
+/// <summary>
+/// A documented UMP error
+/// </summary>
+public class UMPException : Exception
+{
+    /// <summary>
+    /// Error code of the error
+    /// </summary>
+    public int ErrorCode { get; }
+
+    /// <summary>
+    /// Create a new UMP error
+    /// </summary>
+    /// <param name="errorCode">Error code of the error</param>
+    /// <param name="message">Message to log</param>
+    public UMPException(int errorCode, string message) : base(message)
+    {
+        ErrorCode = errorCode;
+    }
+
+    public override string ToString()
+    {
+        return $"UMP ERROR #{ErrorCode.ToString("D4")}\n{Message}";
     }
 }
