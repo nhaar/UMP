@@ -460,7 +460,8 @@ void UMPAddCodeToPatch (UMPPatchFile patch, string codeName)
 {
     if (patch.IsASM)
     {
-        patch.Code = GetDisassemblyText(codeName);
+        // necessary due to linebreak whitespace inconsistency
+        patch.Code = GetDisassemblyText(codeName).Replace("\r", "");
     }
     else
     {
