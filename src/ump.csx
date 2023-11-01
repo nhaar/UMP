@@ -168,7 +168,7 @@ Dictionary<string, string> UMPLoad
             // if the symbol is not defined, remove the code
             if (!symbolList.Contains(match.Value))
             {
-                code = Regex.Replace(code, @$"#if\s+{match.Value}[\s\S]*?#endif", "");
+                code = Regex.Replace(code, @$"#if\s+{match.Value}[\s\S]*?#endif\s*?\n", "");
             }
             // remove only #if
             else
