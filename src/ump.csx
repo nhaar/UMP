@@ -177,7 +177,7 @@ Dictionary<string, string> UMPLoad
         }
 
         // all endifs from defined symbols
-        code = Regex.Replace(code, @"#endif", "");
+        code = Regex.Replace(code, @"#endif\s*?\n", "");
 
         if (file.EndsWith(".gml"))
         {
