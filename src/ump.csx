@@ -256,85 +256,85 @@ Dictionary<string, string> UMPLoad
             try
             {
                 
-            string currentFunction = "";
-            int i = 0;
-            int start = 0;
-            int depth = 0;
-            while (i < code.Length)
-            {
-                char c = code[i];
-                if (c == 'f')
+                string currentFunction = "";
+                int i = 0;
+                int start = 0;
+                int depth = 0;
+                while (i < code.Length)
                 {
-                    if (code.Substring(i, 8) == "function")
+                    char c = code[i];
+                    if (c == 'f')
                     {
-                        start = i;
-                        i += 8;
-                        int nameStart = i;
-                        while (code[i] != '(')
+                        if (code.Substring(i, 8) == "function")
                         {
-                            i++;
-                        }
-                        string functionName = code.Substring(nameStart, i - nameStart).Trim();
-                        List<string> args = new();
-                        nameStart = i + 1;
-                        while (true)
-                        {
-                            bool endLoop = code[i] == ')';
-                            if (code[i] == ',' || endLoop)
+                            start = i;
+                            i += 8;
+                            int nameStart = i;
+                            while (code[i] != '(')
                             {
-                                string argName = code.Substring(nameStart, i - nameStart).Trim();
-                                if (argName != "")
-                                    args.Add(argName);
-                                nameStart = i + 1;
-                                if (endLoop)
-                                    break;
+                                i++;
                             }
-                            i++;
-                        }
-                        while (code[i] != '{')
-                        {
-                            i++;
-                        }
-                        int codeStart = i + 1;
-                        do
-                        {
-                            if (code[i] == '{')
+                            string functionName = code.Substring(nameStart, i - nameStart).Trim();
+                            List<string> args = new();
+                            nameStart = i + 1;
+                            while (true)
                             {
-                                depth++;
+                                bool endLoop = code[i] == ')';
+                                if (code[i] == ',' || endLoop)
+                                {
+                                    string argName = code.Substring(nameStart, i - nameStart).Trim();
+                                    if (argName != "")
+                                        args.Add(argName);
+                                    nameStart = i + 1;
+                                    if (endLoop)
+                                        break;
+                                }
+                                i++;
                             }
-                            else if (code[i] == '}')
+                            while (code[i] != '{')
                             {
-                                depth--;
+                                i++;
                             }
-                            i++;
-                        }
-                        while (depth > 0);
-                        // - 1 at the end to remove the last }
-                        string functionCodeBlock = code.Substring(codeStart, i - codeStart - 1);
+                            int codeStart = i + 1;
+                            do
+                            {
+                                if (code[i] == '{')
+                                {
+                                    depth++;
+                                }
+                                else if (code[i] == '}')
+                                {
+                                    depth--;
+                                }
+                                i++;
+                            }
+                            while (depth > 0);
+                            // - 1 at the end to remove the last }
+                            string functionCodeBlock = code.Substring(codeStart, i - codeStart - 1);
 
-                        
-                        List<string> gmlArgs = new();
-                        // initializing args, unless they are argumentN in gamemaker because those already work normally
-                        for (int j = 0; j < args.Count; j++)
-                        {
-                            gmlArgs.Add("argument" + j);
-                            string arg = args[j];
-                            if (arg.StartsWith("argument"))
+                            
+                            List<string> gmlArgs = new();
+                            // initializing args, unless they are argumentN in gamemaker because those already work normally
+                            for (int j = 0; j < args.Count; j++)
                             {
-                                continue;
+                                gmlArgs.Add("argument" + j);
+                                string arg = args[j];
+                                if (arg.StartsWith("argument"))
+                                {
+                                    continue;
+                                }
+                                else
+                                {
+                                    functionCodeBlock = $"var {arg} = argument{j};" + functionCodeBlock;
+                                }
                             }
-                            else
-                            {
-                                functionCodeBlock = $"var {arg} = argument{j};" + functionCodeBlock;
-                            }
-                        }
-                        functionCodeBlock = $"function {functionName}({string.Join(", ", gmlArgs)}) {{ {functionCodeBlock} }}";
-                        string entryName = $"gml_GlobalScript_{functionName}";
+                            functionCodeBlock = $"function {functionName}({string.Join(", ", gmlArgs)}) {{ {functionCodeBlock} }}";
+                            string entryName = $"gml_GlobalScript_{functionName}";
                             if (!useFunctions) entryName = entryName.Replace("gml_GlobalScript", "gml_Script");
-                        functions.Add(new UMPFunctionEntry(entryName, functionCodeBlock, functionName, false));
+                            functions.Add(new UMPFunctionEntry(entryName, functionCodeBlock, functionName, false));
+                        }
                     }
-                }
-                i++;
+                    i++;
                 }
             }
             catch (System.Exception e)
@@ -419,8 +419,8 @@ Dictionary<string, string> UMPLoad
     foreach (UMPFunctionEntry entry in functionsInOrder)
     {
         if (useFunctions)
-    {
-        UMPImportCodeEntry(entry);
+        {
+            UMPImportCodeEntry(entry);
         }
         else
         {
