@@ -81,6 +81,8 @@ abstract class UMPLoader
     {
         public string Code { get; set; }
 
+        public Dictionary<string, Dictionary<string ,int>> Enums { get; set; }
+
         public string[] Symbols { get; set; }
 
         public int Index { get; set; }
@@ -215,6 +217,52 @@ abstract class UMPLoader
             TraverseIfBlock(condition);
         }
 
+        public string ReadWordAhead ()
+        {
+            int i = Index;
+            string word = "";
+            while (Inbounds && char.IsLetterOrDigit(CurrentChar) || CurrentChar == '_')
+            {
+                word += CurrentChar;
+                Skip();
+            }
+            Index = i;
+            return word;
+        }
+
+        public void ProcessEnum (string enumName)
+        {
+            string word;
+            // accessing enum property
+            if (CurrentChar == '#')
+            {
+                Skip();
+                word = ReadWordAhead();
+                if (word == "length")
+                {
+                    ProcessedCode += Enums[enumName].Count.ToString();
+                }
+                else
+                {
+                    // ADD ERROR HERE LATER and more
+                }
+            }
+            // add error for having no name here
+            else
+            {
+                word = ReadWordAhead();
+                if (Enums[enumName].ContainsKey(word))
+                {
+                    ProcessedCode += Enums[enumName][word].ToString();
+                }
+                else
+                {
+                    // ADD ERROR HERE LATER
+                }
+            }
+            Skip(word.Length);
+        }
+
         public string Preprocess ()
         {
             ProcessedCode = "";
@@ -237,10 +285,22 @@ abstract class UMPLoader
                     }
                     case '#':
                     {
-                        if (Code.Substring(Index + 1, 2) == "if")
+                        Skip(1);
+                        string word = ReadWordAhead();
+                        if (word == "if")
                         {
-                            Skip(3);
+                            Skip(2);
                             ProcessIfBlock();
+                        }
+                        else
+                        {
+                            char afterWord = Code[Index + word.Length];
+                            // enums
+                            if (afterWord == '.')
+                            {
+                                Skip(word.Length + 1);
+                                ProcessEnum(word);
+                            }
                         }
                         break;
                     }
@@ -251,10 +311,11 @@ abstract class UMPLoader
             return ProcessedCode;
         }
 
-        public CodeProcessor (string code, string[] symbols)
+        public CodeProcessor (string code, string[] symbols, Dictionary<string, Dictionary<string, int>> enums)
         {
             Code = code;
             Symbols = symbols;
+            Enums = enums;
         }
     }
 }
