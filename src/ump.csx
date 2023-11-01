@@ -433,7 +433,15 @@ Dictionary<string, string> UMPLoad
                 }
                 else
                 {
-                    UMPAppendGML(entry.Name, command.NewCode);
+                    try
+                    {
+                        UMPAppendGML(entry.Name, command.NewCode);
+                        
+                    }
+                    catch (System.Exception)
+                    {
+                        Console.WriteLine(new UMPException(15, $"Error appending code to entry \"{entry.Name}\""))ç    
+                    }
                     if (patch.RequiresCompilation)
                     {
                         UMPAddCodeToPatch(patch, entry.Name);
@@ -449,13 +457,20 @@ Dictionary<string, string> UMPLoad
                 throw new Exception("Unknown command type: " + command.GetType().Name);
             }
 
-            if (patch.IsASM)
+            try
             {
-                ImportASMString(entry.Name, patch.Code);
-            }            
-            else if (patch.RequiresCompilation)
+                if (patch.IsASM)
+                {
+                    ImportASMString(entry.Name, patch.Code);
+                }            
+                else if (patch.RequiresCompilation)
+                {
+                    Data.Code.ByName(entry.Name).ReplaceGML(patch.Code, Data);
+                }
+            }
+            catch (Exception)
             {
-                Data.Code.ByName(entry.Name).ReplaceGML(patch.Code, Data);
+                Console.WriteLine(new UMPException(14, "Error importing code entry \"" + entry.Name + "\""));
             }
         }
     }
@@ -470,14 +485,21 @@ Dictionary<string, string> UMPLoad
 /// <param name="codeName"></param>
 void UMPAddCodeToPatch (UMPPatchFile patch, string codeName)
 {
-    if (patch.IsASM)
+    try
     {
-        // necessary due to linebreak whitespace inconsistency
-        patch.Code = GetDisassemblyText(codeName).Replace("\r", "");
+        if (patch.IsASM)
+        {
+            // necessary due to linebreak whitespace inconsistency
+            patch.Code = GetDisassemblyText(codeName).Replace("\r", "");
+        }
+        else
+        {
+            patch.Code = GetDecompiledText(codeName);
+        }
     }
-    else
+    catch (System.Exception)
     {
-        patch.Code = GetDecompiledText(codeName);
+        Console.WriteLine(new UMPException(12, $"Error decompiling code entry \"{codeName}\""));
     }
 }
 
