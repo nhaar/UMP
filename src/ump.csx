@@ -45,10 +45,28 @@ abstract class UMPLoader
 
     public abstract string[] GetCodeNames (string filePath);
 
+    public Dictionary<string, Dictionary<string, int>> GetEnums ()
+    {
+        Dictionary<string, Dictionary<string, int>> enumValues = new();
+        Type classType = this.GetType();
+        foreach (Type nestedType in classType.GetNestedTypes())
+        {
+            if (nestedType.IsEnum)
+            {
+                Dictionary<string, int> values = Enum.GetNames(nestedType).ToDictionary(name => name, name => (int)Enum.Parse(nestedType, name));
+                enumValues[nestedType.Name] = values;
+            }
+        }
+
+        return enumValues;
+    }
+
     public void Load ()
     {
         string[] searchPatterns = new[] { "*.gml", "*.asm" };
         string[] files = searchPatterns.SelectMany(pattern => Directory.GetFiles(CodePath, pattern, SearchOption.AllDirectories)).ToArray();
+
+        Dictionary<string, string> processedFiles = new();
 
         // preprocessing
         foreach (string file in files)
@@ -75,6 +93,8 @@ abstract class UMPLoader
                     continue;
                 }
             }
+
+            UMPLoader.CodeProcessor processor = new(code, this);
         }
     }
 
@@ -360,12 +380,12 @@ abstract class UMPLoader
             return ProcessedCode;
         }
 
-        public CodeProcessor (string code, string[] symbols, Dictionary<string, Dictionary<string, int>> enums, UMPLoader loader)
+        public CodeProcessor (string code, UMPLoader loader)
         {
             Code = code;
-            Symbols = symbols;
-            Enums = enums;
             Loader = loader;
+            Symbols = loader.Symbols;
+            Enums = loader.GetEnums();
         }
     }
 }
