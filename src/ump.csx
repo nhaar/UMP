@@ -250,9 +250,11 @@ Dictionary<string, string> UMPLoad
             )
         }
         // "opening" function files
-        else if (code.StartsWith("/// FUNCTIONS"))
+        if (code.StartsWith("/// FUNCTIONS"))
         {
-            // to-do: add errors for invalid syntax
+            try
+            {
+                
             string currentFunction = "";
             int i = 0;
             int start = 0;
@@ -331,6 +333,11 @@ Dictionary<string, string> UMPLoad
                     }
                 }
                 i++;
+                }
+            }
+            catch (System.Exception e)
+            {                
+                Console.WriteLine(new UMPException(16, $"Error processing functions in file \"{file}\""));
             }
         }
         else if (Regex.IsMatch(code, @"^/// (IMPORT|PATCH)"))
