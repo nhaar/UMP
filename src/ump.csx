@@ -137,11 +137,13 @@ abstract class UMPLoader
 
         public void AddComment ()
         {
+            Console.WriteLine(Index);
             Advance(2);
             while (Inbounds && CurrentChar != '\n')
             {
                 Advance();
             }
+            Advance();
         }
 
         public void SkipWhitespace ()
@@ -197,8 +199,7 @@ abstract class UMPLoader
             }
             if (Code.Substring(Index + 1, 5) == "endif")
             {
-                Skip(6);
-                SkipToLineEnd();
+                SkipLine();
             }
             // ADD MORE OPTIONS HERE LATER 
             else
@@ -268,6 +269,7 @@ abstract class UMPLoader
             ProcessedCode = "";
             while (Inbounds)
             {
+                Console.WriteLine(CurrentChar);
                 switch (CurrentChar)
                 {
                     case '"':
@@ -280,6 +282,10 @@ abstract class UMPLoader
                         if (Code[Index + 1] == '/')
                         {
                             AddComment();
+                        }
+                        else
+                        {
+                            Advance();
                         }
                         break;
                     }
@@ -304,8 +310,12 @@ abstract class UMPLoader
                         }
                         break;
                     }
-                }
+                    default:
+                    {
                 Advance();
+                        break;
+                    }
+                }
             }
 
             return ProcessedCode;
