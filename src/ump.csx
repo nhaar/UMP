@@ -27,15 +27,15 @@ abstract class UMPLoader
 
     public string CodePath { get; set; }
 
-    public UMPCaseConverter.NameCase EnumNameCase { get; set; };
+    public UMPCaseConverter.NameCase EnumNameCase { get; set; }
 
-    public UMPCaseConverter.NameCase EnumMemberCase { get; set; };
+    public UMPCaseConverter.NameCase EnumMemberCase { get; set; }
 
-    public string[] Symbols { get; set; };
+    public string[] Symbols { get; set; }
 
-    public bool UseGlobalScripts { get; set; };
+    public bool UseGlobalScripts { get; set; }
 
-    public bool EnableCache { get; set; };
+    public bool EnableCache { get; set; }
 
     public UMPLoader (UMPWrapper wrapper)
     {
@@ -47,8 +47,9 @@ abstract class UMPLoader
     public void Load ()
     {
         string[] searchPatterns = new[] { "*.gml", "*.asm" };
-        string[] files = searchPatterns.SelectMany(pattern => Directory.GetFiles(searchPath, pattern, SearchOption.AllDirectories)).ToArray();
+        string[] files = searchPatterns.SelectMany(pattern => Directory.GetFiles(CodePath, pattern, SearchOption.AllDirectories)).ToArray();
 
+        // preprocessing
         foreach (string file in files)
         {
             string code = File.ReadAllText(file);
@@ -61,7 +62,7 @@ abstract class UMPLoader
                 string negativeCondition = Regex.Match(code, ifndefPattern).Value;
                 if (positiveCondition == negativeCondition && negativeCondition == "")
                 {
-                    // ADD ERROR LATER
+                    // ADD ERROR LATER: needs to specify condition
                 }
                 // ignore if the condition is met (based on the symbol)
                 if
@@ -73,6 +74,187 @@ abstract class UMPLoader
                     continue;
                 }
             }
+        }
+    }
+
+    public class CodeProcessor
+    {
+        public string Code { get; set; }
+
+        public string[] Symbols { get; set; }
+
+        public int Index { get; set; }
+
+        public void Skip (int amount = 1)
+        {
+            Index += amount;
+        }
+
+        public void Advance (int amount = 1)
+        {
+            int i = 0;
+            while (Inbounds && i < amount)
+            {
+                ProcessedCode += CurrentChar;
+                Index++;
+                i++;
+            }
+        }
+
+        public char CurrentChar => Code[Index];
+
+        public void AddString ()
+        {
+            Advance();
+            while (CurrentChar != '"')
+            {
+                if (CurrentChar == '\\')
+                {
+                    Advance();
+                }
+                Advance();
+            }
+            Advance();
+        }
+
+        public void SkipString ()
+        {
+            Skip();
+            while (CurrentChar != '"')
+            {
+                if (CurrentChar == '\\')
+                {
+                    Skip();
+                }
+                Skip();
+            }
+            Skip();
+        }
+
+        public bool Inbounds => Index < Code.Length;
+
+        public void AddComment ()
+        {
+            Advance(2);
+            while (Inbounds && CurrentChar != '\n')
+            {
+                Advance();
+            }
+        }
+
+        public void SkipWhitespace ()
+        {
+            while (Inbounds && char.IsWhiteSpace(CurrentChar))
+            {
+                Skip();
+            }
+        }
+
+        public void SkipToLineEnd ()
+        {
+            while (Inbounds && CurrentChar != '\n')
+            {
+                Skip();
+            }
+        }
+
+
+        public void SkipLine ()
+        {
+            SkipToLineEnd();
+            Skip();
+        }
+
+        
+
+        public string ReadSymbol ()
+        {
+            string symbol = "";
+            while (Inbounds && char.IsLetterOrDigit(CurrentChar) || CurrentChar == '_')
+            {
+                symbol += CurrentChar;
+                Skip();
+            }
+            return symbol;
+        }
+
+        public string ProcessedCode { get; set; }
+
+        public void TraverseIfBlock (bool condition)
+        {
+            while (Inbounds && CurrentChar != '#')
+            {
+                if (condition)
+                {
+                    Advance();
+                }
+                else
+                {
+                    Skip();
+                }
+            }
+            if (Code.Substring(Index + 1, 5) == "endif")
+            {
+                Skip(6);
+                SkipToLineEnd();
+            }
+            // ADD MORE OPTIONS HERE LATER 
+            else
+            {
+                TraverseIfBlock(condition);
+            }
+        }
+
+        public void ProcessIfBlock ()
+        {
+            string symbol = ReadSymbol();
+            // ADD error for no symbol
+            SkipLine();
+            bool condition = Symbols.Contains(symbol);
+            SkipWhitespace();
+            TraverseIfBlock(condition);
+        }
+
+        public string Preprocess ()
+        {
+            ProcessedCode = "";
+            while (Inbounds)
+            {
+                switch (CurrentChar)
+                {
+                    case '"':
+                    {
+                        AddString();
+                        break;
+                    }
+                    case '/':
+                    {
+                        if (Code[Index + 1] == '/')
+                        {
+                            AddComment();
+                        }
+                        break;
+                    }
+                    case '#':
+                    {
+                        if (Code.Substring(Index + 1, 2) == "if")
+                        {
+                            Skip(3);
+                            ProcessIfBlock();
+                        }
+                        break;
+                    }
+                }
+                Advance();
+            }
+
+            return ProcessedCode;
+        }
+
+        public CodeProcessor (string code, string[] symbols)
+        {
+            Code = code;
+            Symbols = symbols;
         }
     }
 }
@@ -516,7 +698,7 @@ Dictionary<string, string> UMPLoad
             }
             else
             {
-                scriptCode = Data.Code.ByName(codeName).ReplaceGML(functionBody, Data);
+                Data.Code.ByName(codeName).ReplaceGML(functionBody, Data);
             }
         }
     }
@@ -1102,13 +1284,13 @@ public class UMPException : Exception
 
 public class UMPWrapper
 {
-    public UndertaleCode Data;
+    public UndertaleData Data;
 
-    public string ScriptPath
+    public string ScriptPath;
 
     public UMPWrapper
     (
-        UndertaleCode data,
+        UndertaleData data,
         string scriptPath
     )
     {
