@@ -237,7 +237,18 @@ Dictionary<string, string> UMPLoad
     
         // ignoring files
         if (useIgnore && Regex.IsMatch(code, @"^///.*?\.ignore"))
-            continue;
+        {
+            string positiveCondition = Regex.Match(code, @"(?<=^///.*?\.ignore\s+if\s+)[\d\w_]+").Value;
+            string negativeCondition = Regex.Match(code, @"(?<=^///.*?\.ignore\s+ifndef\s+)[\d\w_]+").Value;
+            if
+            (
+                (positiveCondition == negativeCondition && positiveCondition == "") ||
+                (
+                    (positiveCondition != "" && symbolList.Contains(positiveCondition)) ||
+                    (negativeCondition != "" && !symbolList.Contains(negativeCondition))
+                )
+            )
+        }
         // "opening" function files
         else if (code.StartsWith("/// FUNCTIONS"))
         {
