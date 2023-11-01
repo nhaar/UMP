@@ -1,5 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
+using System.Reflection;
 using Newtonsoft.Json;
 using System.Linq;
 
@@ -81,6 +82,8 @@ abstract class UMPLoader
     {
         public string Code { get; set; }
 
+        public UMPLoader Loader { get; set; }
+
         public Dictionary<string, Dictionary<string ,int>> Enums { get; set; }
 
         public string[] Symbols { get; set; }
@@ -137,7 +140,6 @@ abstract class UMPLoader
 
         public void AddComment ()
         {
-            Console.WriteLine(Index);
             Advance(2);
             while (Inbounds && CurrentChar != '\n')
             {
@@ -171,15 +173,15 @@ abstract class UMPLoader
 
         
 
-        public string ReadSymbol ()
+        public string SkipWordAhead ()
         {
-            string symbol = "";
+            string word = "";
             while (Inbounds && char.IsLetterOrDigit(CurrentChar) || CurrentChar == '_')
             {
-                symbol += CurrentChar;
+                word += CurrentChar;
                 Skip();
             }
-            return symbol;
+            return word;
         }
 
         public string ProcessedCode { get; set; }
@@ -210,7 +212,7 @@ abstract class UMPLoader
 
         public void ProcessIfBlock ()
         {
-            string symbol = ReadSymbol();
+            string symbol = SkipWordAhead();
             // ADD error for no symbol
             SkipLine();
             bool condition = Symbols.Contains(symbol);
@@ -264,12 +266,43 @@ abstract class UMPLoader
             Skip(word.Length);
         }
 
+        public void ProcessMethod (string method)
+        {
+            List<object> methodArgs = new();
+            while (Inbounds && CurrentChar != ')')
+            {
+                if (CurrentChar == '"')
+                {
+                    int start = Index;
+                    SkipString();
+                    string str = Code.Substring(start + 1, Index - start - 2);
+                    methodArgs.Add(str);
+                }
+                // add support for more types: mainly INT and float
+                else
+                {
+                   Skip();
+                }
+            }
+
+            // add error if wrong arg count, types and etc
+            MethodInfo methodInfo = Loader.GetType().GetMethod(method);
+            if (methodInfo == null)
+            {
+                // ADD ERROR HERE LATER
+            }
+            else
+            {
+                object result = methodInfo.Invoke(Loader, methodArgs.ToArray());
+                ProcessedCode += (string)result;
+            }
+        }
+
         public string Preprocess ()
         {
             ProcessedCode = "";
             while (Inbounds)
             {
-                Console.WriteLine(CurrentChar);
                 switch (CurrentChar)
                 {
                     case '"':
@@ -307,6 +340,12 @@ abstract class UMPLoader
                                 Skip(word.Length + 1);
                                 ProcessEnum(word);
                             }
+                            // user methods
+                            else if (afterWord == '(')
+                            {
+                                Skip(word.Length + 1);
+                                ProcessMethod(word);
+                            }
                         }
                         break;
                     }
@@ -321,11 +360,12 @@ abstract class UMPLoader
             return ProcessedCode;
         }
 
-        public CodeProcessor (string code, string[] symbols, Dictionary<string, Dictionary<string, int>> enums)
+        public CodeProcessor (string code, string[] symbols, Dictionary<string, Dictionary<string, int>> enums, UMPLoader loader)
         {
             Code = code;
             Symbols = symbols;
             Enums = enums;
+            Loader = loader;
         }
     }
 }
