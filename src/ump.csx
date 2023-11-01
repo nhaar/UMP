@@ -3,6 +3,80 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using System.Linq;
 
+UMPWrapper UMP_WRAPPER = new UMPWrapper
+(
+    Data,
+    ScriptPath
+);
+
+    // string modPath = null, -> CodePath
+    // string codeNameWithExtension = null, -> not supported
+    // string codeString = null, -> not supported
+    // Type[] enums = null, -> all enums defined within the class will be automatically retrieved
+    // bool convertCase = false, -> dropped
+    // UMPCaseConverter.NameCase enumNameCase = UMPCaseConverter.NameCase.PascalCase,
+    // UMPCaseConverter.NameCase enumMemberCase = UMPCaseConverter.NameCase.PascalCase,
+    // string[] objectPrefixes = null, -> dropped! (use should implement this themselves)
+    // bool useIgnore = true, -> DROPPED! ignore is always on now.
+    // string[] symbols = null, ->
+    // bool useFunctions = true
+
+abstract class UMPLoader
+{
+    public UMPWrapper Wrapper { get; set; }
+
+    public string CodePath { get; set; }
+
+    public UMPCaseConverter.NameCase EnumNameCase { get; set; };
+
+    public UMPCaseConverter.NameCase EnumMemberCase { get; set; };
+
+    public string[] Symbols { get; set; };
+
+    public bool UseGlobalScripts { get; set; };
+
+    public bool EnableCache { get; set; };
+
+    public UMPLoader (UMPWrapper wrapper)
+    {
+        Wrapper = wrapper;
+    }
+
+    public abstract string[] GetCodeNames (string filePath);
+
+    public void Load ()
+    {
+        string[] searchPatterns = new[] { "*.gml", "*.asm" };
+        string[] files = searchPatterns.SelectMany(pattern => Directory.GetFiles(searchPath, pattern, SearchOption.AllDirectories)).ToArray();
+
+        foreach (string file in files)
+        {
+            string code = File.ReadAllText(file);
+            // ignoring files
+            if (Regex.IsMatch(code, @"^///.*?\.ignore"))
+            {
+                string ifPattern = @"(?<=^///.*?\.ignore\s+if\s+)[\d\w_]+";
+                string ifndefPattern = ifPattern.Replace("if", "ifndef");
+                string positiveCondition = Regex.Match(code, ifPattern).Value;
+                string negativeCondition = Regex.Match(code, ifndefPattern).Value;
+                if (positiveCondition == negativeCondition && negativeCondition == "")
+                {
+                    // ADD ERROR LATER
+                }
+                // ignore if the condition is met (based on the symbol)
+                if
+                (
+                    (positiveCondition != "" && Symbols.Contains(positiveCondition)) ||
+                    (negativeCondition != "" && !Symbols.Contains(negativeCondition))
+                )
+                {
+                    continue;
+                }
+            }
+        }
+    }
+}
+
 /// <summary>
 /// Loads GML or ASM code, through a file or a string, and imports it into the game using the UMP processing options
 /// </summary>
@@ -249,6 +323,9 @@ Dictionary<string, string> UMPLoad
                     (negativeCondition != "" && !symbolList.Contains(negativeCondition))
                 )
             )
+            {
+                continue;
+            }
         }
         // "opening" function files
         if (code.StartsWith("/// FUNCTIONS"))
@@ -1020,5 +1097,22 @@ public class UMPException : Exception
     public override string ToString()
     {
         return $"UMP ERROR #{ErrorCode.ToString("D4")}\n{Message}";
+    }
+}
+
+public class UMPWrapper
+{
+    public UndertaleCode Data;
+
+    public string ScriptPath
+
+    public UMPWrapper
+    (
+        UndertaleCode data,
+        string scriptPath
+    )
+    {
+        Data = data;
+        ScriptPath = scriptPath;
     }
 }
