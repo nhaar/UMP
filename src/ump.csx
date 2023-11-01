@@ -29,7 +29,8 @@ Dictionary<string, string> UMPLoad
     UMPCaseConverter.NameCase enumMemberCase = UMPCaseConverter.NameCase.PascalCase,
     string[] objectPrefixes = null,
     bool useIgnore = true,
-    string[] symbols = null
+    string[] symbols = null,
+    bool useFunctions = true
 )
 {
     Dictionary<string, string> originalCode = new();
@@ -329,6 +330,7 @@ Dictionary<string, string> UMPLoad
                         }
                         functionCodeBlock = $"function {functionName}({string.Join(", ", gmlArgs)}) {{ {functionCodeBlock} }}";
                         string entryName = $"gml_GlobalScript_{functionName}";
+                            if (!useFunctions) entryName = entryName.Replace("gml_GlobalScript", "gml_Script");
                         functions.Add(new UMPFunctionEntry(entryName, functionCodeBlock, functionName, false));
                     }
                 }
@@ -353,6 +355,11 @@ Dictionary<string, string> UMPLoad
                 {
                     codeName = $"gml_Object_{codeName}";
                 }
+            }
+
+            if (!useFunctions)
+            {
+                codeName = codeName.Replace("gml_GlobalScript", "gml_Script");
             }
 
             UMPCodeEntry codeEntry = new UMPCodeEntry(codeName, code, isASM);
@@ -411,7 +418,30 @@ Dictionary<string, string> UMPLoad
 
     foreach (UMPFunctionEntry entry in functionsInOrder)
     {
+        if (useFunctions)
+    {
         UMPImportCodeEntry(entry);
+        }
+        else
+        {
+            string functionBody = Regex.Match(entry.Code, @"(?<=^\s*function[\s\d\w_]+\(.*?\)\s*{)[\s\S]+(?=}\s*$)").Value;
+            // if the script was defined without "function"
+            if (functionBody == "")
+            {
+                functionBody = entry.Code;
+            }
+            string scriptName = entry.FunctionName;
+            string codeName = entry.Name.Replace("gml_GlobalScript", "gml_Script");
+            UndertaleCode scriptCode = null;
+            if (Data.Scripts.ByName(scriptName) == null)
+            {
+                ImportGMLString(codeName, functionBody);
+            }
+            else
+            {
+                scriptCode = Data.Code.ByName(codeName).ReplaceGML(functionBody, Data);
+            }
+        }
     }
 
     foreach (UMPCodeEntry entry in imports)
