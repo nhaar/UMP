@@ -196,16 +196,28 @@ Dictionary<string, string> UMPLoad
             code = code.Replace(@"#endcode", "");
 
             // inserting enums
-            Regex enumPattern = new Regex(@"#[\w\d_]+\.[\w\d_]+");
+            Regex enumPattern = new Regex(@"#[\w\d_]+\.[#\w\d_][\w\d_]*");
             code = enumPattern.Replace(code, match =>
             {
                 string value = match.Value;
                 string[] names = value.Split('.');
                 string enumName = names[0].Substring(1);
-                string enumMember = names[1];
                 if (!enumValues.ContainsKey(enumName))
                 {
                     Console.WriteLine(new UMPException(7, $"Enum \"{enumName}\" not found in given enums"));
+                }
+                string enumMember = names[1];
+                if (enumMember.StartsWith("#"))
+                {
+                    enumMember = enumMember.Substring(1);
+                    switch (enumMember)
+                    {
+                        case "length":
+                            return enumValues[enumName].Count.ToString();
+                        default:
+                            Console.WriteLine(new UMPException(13, $"Unknown enum property \"{enumMember}\""));
+                            return "";
+                    }
                 }
                 if (!enumValues[enumName].ContainsKey(enumMember))
                 {
