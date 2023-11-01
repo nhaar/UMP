@@ -750,7 +750,7 @@ class UMPPatchFile
                     }
                     else
                     {
-                        Console.WriteLine("WARNING: Unknown command in patch file: " + line);
+                        Console.WriteLine($"WARNING: Unknown command ({line}) in patch file: {entryName}");
                     }
                 }
             }
