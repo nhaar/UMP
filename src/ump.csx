@@ -488,7 +488,7 @@ Dictionary<string, string> UMPLoad
                     }
                     catch (System.Exception)
                     {
-                        Console.WriteLine(new UMPException(15, $"Error appending code to entry \"{entry.Name}\""))ç    
+                        Console.WriteLine(new UMPException(15, $"Error appending code to entry \"{entry.Name}\""));
                     }
                     if (patch.RequiresCompilation)
                     {
