@@ -23,7 +23,7 @@ abstract class UMPLoader
 {
     public UMPWrapper Wrapper { get; set; }
 
-    public abstract string CodePath { get; set; }
+    public abstract string CodePath { get; }
 
     public string AbsoluteCodePath { get; set; }
 
