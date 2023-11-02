@@ -34,14 +34,14 @@ abstract class UMPLoader
         // going until UMPLoader is equivalent to getting all user defined classes
         for (Type classType = this.GetType(); !classType.Name.Contains("UMPLoader"); classType = classType.BaseType)
         {
-        foreach (Type nestedType in classType.GetNestedTypes())
-        {
-            if (nestedType.IsEnum)
+            foreach (Type nestedType in classType.GetNestedTypes())
             {
-                Dictionary<string, int> values = Enum.GetNames(nestedType).ToDictionary(name => name, name => (int)Enum.Parse(nestedType, name));
-                enumValues[nestedType.Name] = values;
+                if (nestedType.IsEnum)
+                {
+                    Dictionary<string, int> values = Enum.GetNames(nestedType).ToDictionary(name => name, name => (int)Enum.Parse(nestedType, name));
+                    enumValues[nestedType.Name] = values;
+                }
             }
-        }
         }
 
         return enumValues;
@@ -563,6 +563,7 @@ abstract class UMPLoader
 
         public void ProcessIfBlock ()
         {
+            SkipWhitespace();
             string symbol = SkipWordAhead();
             if (symbol == "")
             {
