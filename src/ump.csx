@@ -338,7 +338,7 @@ abstract class UMPLoader
             UMPPatchFile patch = new UMPPatchFile(entry.Code, entry.Name, entry.IsASM, Wrapper);
             if (patch.RequiresCompilation)
             {
-                patch.UMPAddCodeToPatch(patch, entry.Name);
+                patch.UMPAddCodeToPatch(entry.Name);
             }
 
             foreach (UMPPatchCommand command in patch.Commands)
@@ -379,7 +379,7 @@ abstract class UMPLoader
                         }
                         if (patch.RequiresCompilation)
                         {
-                            patch.UMPAddCodeToPatch(patch, entry.Name);
+                            patch.UMPAddCodeToPatch(entry.Name);
                         }
                     }
                 }
@@ -403,9 +403,10 @@ abstract class UMPLoader
                         Wrapper.Data.Code.ByName(entry.Name).ReplaceGML(patch.Code, Wrapper.Data);
                     }
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
                     ThrowLoadException($"Error importing code entry \"{entry.Name}\"", 12);
+                    throw e;
                 }
             }
         }
@@ -985,23 +986,24 @@ class UMPPatchFile
         }
     }
 
-    public void UMPAddCodeToPatch (UMPPatchFile patch, string codeName)
+    public void UMPAddCodeToPatch (string codeName)
     {
         try
         {
-            if (patch.IsASM)
+            if (IsASM)
             {
                 // necessary due to linebreak whitespace inconsistency
-                patch.Code = Wrapper.GetDisassemblyText(codeName).Replace("\r", "");
+                Code = Wrapper.GetDisassemblyText(codeName).Replace("\r", "");
             }
             else
             {
-                patch.Code = Wrapper.GetDecompiledText(codeName);
+                Code = Wrapper.GetDecompiledText(codeName);
             }
         }
-        catch (System.Exception)
+        catch (System.Exception e)
         {
             Console.WriteLine(new UMPException(12, $"Error decompiling code entry \"{codeName}\""));
+            throw e;
         }
     }
 }
