@@ -49,8 +49,26 @@ abstract class UMPLoader
     {
         string[] searchPatterns = new[] { "*.gml", "*.asm" };
         string scriptDir = Path.GetDirectoryName(Wrapper.ScriptPath);
-        string absoluteCodePath = Path.Combine(scriptDir, CodePath);
-        string[] files = searchPatterns.SelectMany(pattern => Directory.GetFiles(absoluteCodePath, pattern, SearchOption.AllDirectories)).ToArray();
+
+        string absoluteCodePath = "";
+        try
+        {
+            absoluteCodePath = Path.Combine(scriptDir, CodePath);
+
+        }
+        catch
+        {
+            ThrowLoadException("Error getting code path", 1);
+        }
+        string[] files = null;
+        try
+        {
+            files = searchPatterns.SelectMany(pattern => Directory.GetFiles(absoluteCodePath, pattern, SearchOption.AllDirectories)).ToArray();
+        }
+        catch
+        {
+            ThrowLoadException("Error getting code files", 2);
+        }
 
         Dictionary<string, string> processedFiles = new();
 
@@ -67,7 +85,7 @@ abstract class UMPLoader
                 string negativeCondition = Regex.Match(code, ifndefPattern).Value;
                 if (positiveCondition == negativeCondition && negativeCondition == "")
                 {
-                    // ADD ERROR LATER: needs to specify condition
+                    ThrowLoadException($"Invalid \"ignore\" statement in file: {file}", 3);
                 }
                 // ignore if the condition is met (based on the symbol)
                 if
@@ -96,92 +114,110 @@ abstract class UMPLoader
             string code = processedFiles[file];
             // "opening" function files
             if (code.StartsWith("/// FUNCTIONS"))
-            {
-                try
-                {    
-                    string currentFunction = "";
-                    int i = 0;
-                    int start = 0;
-                    int depth = 0;
-                    while (i < code.Length)
+            {    
+                string currentFunction = "";
+                int i = 0;
+                int start = 0;
+                int depth = 0;
+                while (i < code.Length)
+                {
+                    char c = code[i];
+                    if (c == 'f')
                     {
-                        char c = code[i];
-                        if (c == 'f')
+                        if (code.Substring(i, 8) == "function")
                         {
-                            if (code.Substring(i, 8) == "function")
+                            start = i;
+                            i += 8;
+                            int nameStart = i;
+                            while (i < code.Length && code[i] != '(')
                             {
-                                start = i;
-                                i += 8;
-                                int nameStart = i;
-                                while (code[i] != '(')
-                                {
-                                    i++;
-                                }
-                                string functionName = code.Substring(nameStart, i - nameStart).Trim();
-                                List<string> args = new();
-                                nameStart = i + 1;
-                                while (true)
-                                {
-                                    bool endLoop = code[i] == ')';
-                                    if (code[i] == ',' || endLoop)
-                                    {
-                                        string argName = code.Substring(nameStart, i - nameStart).Trim();
-                                        if (argName != "")
-                                            args.Add(argName);
-                                        nameStart = i + 1;
-                                        if (endLoop)
-                                            break;
-                                    }
-                                    i++;
-                                }
-                                while (code[i] != '{')
-                                {
-                                    i++;
-                                }
-                                int codeStart = i + 1;
-                                do
-                                {
-                                    if (code[i] == '{')
-                                    {
-                                        depth++;
-                                    }
-                                    else if (code[i] == '}')
-                                    {
-                                        depth--;
-                                    }
-                                    i++;
-                                }
-                                while (depth > 0);
-                                // - 1 at the end to remove the last }
-                                string functionCodeBlock = code.Substring(codeStart, i - codeStart - 1);
-
-                                
-                                List<string> gmlArgs = new();
-                                // initializing args, unless they are argumentN in gamemaker because those already work normally
-                                for (int j = 0; j < args.Count; j++)
-                                {
-                                    gmlArgs.Add("argument" + j);
-                                    string arg = args[j];
-                                    if (arg.StartsWith("argument"))
-                                    {
-                                        continue;
-                                    }
-                                    else
-                                    {
-                                        functionCodeBlock = $"var {arg} = argument{j};" + functionCodeBlock;
-                                    }
-                                }
-                                functionCodeBlock = $"function {functionName}({string.Join(", ", gmlArgs)}) {{ {functionCodeBlock} }}";
-                                string entryName = UseGlobalScripts ? $"gml_GlobalScript_{functionName}" : $"gml_Script_{functionName}";
-                                functions.Add(new UMPFunctionEntry(entryName, functionCodeBlock, functionName, false, Wrapper));
+                                i++;
                             }
+                            if (i >= code.Length)
+                            {
+                                ThrowLoadException("Function keyword must be preceded by name and parenthesis, in file: " + file, 4);
+                                break;
+                            }
+                            string functionName = code.Substring(nameStart, i - nameStart).Trim();
+                            if (!Regex.IsMatch(functionName, @"[\d][\d\w_]*"))
+                            {
+                                ThrowLoadException("Function name must be a valid variable name, in file: " + file, 5);
+                                break;
+                            }
+                            List<string> args = new();
+                            nameStart = i + 1;
+                            while (i < code.Length && true)
+                            {
+                                bool endLoop = code[i] == ')';
+                                if (code[i] == ',' || endLoop)
+                                {
+                                    string argName = code.Substring(nameStart, i - nameStart).Trim();
+                                    if (argName != "")
+                                        args.Add(argName);
+                                    nameStart = i + 1;
+                                    if (endLoop)
+                                        break;
+                                }
+                                i++;
+                            }
+                            if (i >= code.Length)
+                            {
+                                ThrowLoadException("Function arguments not closed, in file: " + file, 6);
+                                break;
+                            }
+                            while (i < code.Length && code[i] != '{')
+                            {
+                                i++;
+                            }
+                            if (i >= code.Length)
+                            {
+                                ThrowLoadException("Function body not found, in file: " + file, 7);
+                                break;
+                            }
+                            int codeStart = i + 1;
+                            do
+                            {
+                                if (code[i] == '{')
+                                {
+                                    depth++;
+                                }
+                                else if (code[i] == '}')
+                                {
+                                    depth--;
+                                }
+                                i++;
+                            }
+                            while (i < code.Length && depth > 0);
+                            if (i >= code.Length)
+                            {
+                                ThrowLoadException("Function body not closed, in file: " + file, 8);
+                                break;
+                            }
+                            // - 1 at the end to remove the last }
+                            string functionCodeBlock = code.Substring(codeStart, i - codeStart - 1);
+
+                            
+                            List<string> gmlArgs = new();
+                            // initializing args, unless they are argumentN in gamemaker because those already work normally
+                            for (int j = 0; j < args.Count; j++)
+                            {
+                                gmlArgs.Add("argument" + j);
+                                string arg = args[j];
+                                if (arg.StartsWith("argument"))
+                                {
+                                    continue;
+                                }
+                                else
+                                {
+                                    functionCodeBlock = $"var {arg} = argument{j};" + functionCodeBlock;
+                                }
+                            }
+                            functionCodeBlock = $"function {functionName}({string.Join(", ", gmlArgs)}) {{ {functionCodeBlock} }}";
+                            string entryName = UseGlobalScripts ? $"gml_GlobalScript_{functionName}" : $"gml_Script_{functionName}";
+                            functions.Add(new UMPFunctionEntry(entryName, functionCodeBlock, functionName, false, Wrapper));
                         }
-                        i++;
                     }
-                }
-                catch (System.Exception e)
-                {                
-                    Console.WriteLine(new UMPException(16, $"Error processing functions in file \"{file}\""));
+                    i++;
                 }
             }
             else if (Regex.IsMatch(code, @"^/// (IMPORT|PATCH)"))
@@ -202,7 +238,6 @@ abstract class UMPLoader
 
                 }
 
-                
                 foreach (string codeName in codeEntries)
                 {
                     UMPCodeEntry codeEntry = new UMPCodeEntry(codeName, code, isASM, Wrapper);
@@ -233,7 +268,7 @@ abstract class UMPLoader
             }
             else
             {
-                Console.WriteLine(new UMPException(9, $"File \"{file}\" does not have a valid UMP type"));
+                ThrowLoadException($"File \"{file}\" does not have a valid UMP type", 9);
             }
         }
 
@@ -320,6 +355,10 @@ abstract class UMPLoader
                 }
                 else if (command is UMPReplaceCommand)
                 {
+                    if (command.OriginalCode == "")
+                    {
+                        ThrowLoadException("Error in patch file: Replace command requires code to be specified (empty string found)", 10);
+                    }
                     patch.Code = patch.Code.Replace(command.OriginalCode, command.NewCode);
                 }
                 else if (command is UMPAppendCommand)
@@ -333,11 +372,10 @@ abstract class UMPLoader
                         try
                         {
                             AppendGML(entry.Name, command.NewCode);
-                            
                         }
                         catch (System.Exception)
                         {
-                            Console.WriteLine(new UMPException(15, $"Error appending code to entry \"{entry.Name}\""));
+                            ThrowLoadException($"Error appending code to entry \"{entry.Name}\"", 11);
                         }
                         if (patch.RequiresCompilation)
                         {
@@ -367,7 +405,7 @@ abstract class UMPLoader
                 }
                 catch (Exception)
                 {
-                    Console.WriteLine(new UMPException(14, "Error importing code entry \"" + entry.Name + "\""));
+                    ThrowLoadException($"Error importing code entry \"{entry.Name}\"", 12);
                 }
             }
         }
@@ -406,13 +444,17 @@ abstract class UMPLoader
         public void AddString ()
         {
             Advance();
-            while (CurrentChar != '"')
+            while (Inbounds && CurrentChar != '"')
             {
                 if (CurrentChar == '\\')
                 {
                     Advance();
                 }
                 Advance();
+            }
+            if (!Inbounds)
+            {
+                ThrowStringException();
             }
             Advance();
         }
@@ -428,7 +470,16 @@ abstract class UMPLoader
                 }
                 Skip();
             }
+            if (!Inbounds)
+            {
+                ThrowStringException();   
+            }
             Skip();
+        }
+
+        public void ThrowStringException ()
+        {
+            Loader.ThrowLoadException("String not closed in code", 13);
         }
 
         public bool Inbounds => Index < Code.Length;
@@ -494,6 +545,10 @@ abstract class UMPLoader
                     Skip();
                 }
             }
+            if (!Inbounds)
+            {
+                Loader.ThrowLoadException("Preprocessing if block not closed in code", 14);
+            }
             if (Code.Substring(Index + 1, 5) == "endif")
             {
                 SkipLine();
@@ -508,7 +563,10 @@ abstract class UMPLoader
         public void ProcessIfBlock ()
         {
             string symbol = SkipWordAhead();
-            // ADD error for no symbol
+            if (symbol == "")
+            {
+                Loader.ThrowLoadException("No symbol found after if keyword", 15);
+            }
             SkipLine();
             bool condition = Symbols?.Contains(symbol) ?? false;
             SkipWhitespace();
@@ -530,6 +588,10 @@ abstract class UMPLoader
 
         public void ProcessEnum (string enumName)
         {
+            if (!Enums.ContainsKey(enumName))
+            {
+                Loader.ThrowLoadException($"Enum \"{enumName}\" not found", 16);
+            }
             string word;
             // accessing enum property
             if (CurrentChar == '#')
@@ -542,10 +604,9 @@ abstract class UMPLoader
                 }
                 else
                 {
-                    // ADD ERROR HERE LATER and more
+                    Loader.ThrowLoadException("Invalid UMP enum property in code", 17);
                 }
             }
-            // add error for having no name here
             else
             {
                 word = ReadWordAhead();
@@ -555,7 +616,7 @@ abstract class UMPLoader
                 }
                 else
                 {
-                    // ADD ERROR HERE LATER
+                    Loader.ThrowLoadException($"Enum value \"{word}\" not found in enum \"{enumName}\"", 18);
                 }
             }
             Skip(word.Length);
@@ -564,6 +625,7 @@ abstract class UMPLoader
         public void ProcessMethod (string method)
         {
             List<object> methodArgs = new();
+            // TO-DO: require arguments to be comma separated
             while (Inbounds && CurrentChar != ')')
             {
                 if (CurrentChar == '"')
@@ -579,17 +641,28 @@ abstract class UMPLoader
                    Skip();
                 }
             }
+            if (!Inbounds)
+            {
+                Loader.ThrowLoadException("UMP Method not closed in code", 19);
+            }
 
             // add error if wrong arg count, types and etc
             MethodInfo methodInfo = Loader.GetType().GetMethod(method);
             if (methodInfo == null)
             {
-                // ADD ERROR HERE LATER
+                Loader.ThrowLoadException($"UMP Method \"{method}\" not found", 20);
             }
             else
             {
-                object result = methodInfo.Invoke(Loader, methodArgs.ToArray());
-                ProcessedCode += (string)result;
+                try
+                {
+                    object result = methodInfo.Invoke(Loader, methodArgs.ToArray());
+                    ProcessedCode += (string)result;
+                }
+                catch
+                {
+                    Loader.ThrowLoadException($"UMP Method \"{method}\" failed", 21);
+                }
             }
         }
 
@@ -667,6 +740,11 @@ abstract class UMPLoader
     public void ThrowLoadException (string message, int errorCode)
     {
         Wrapper.ScriptError($"UMP ERROR {errorCode}\n\n{message}");
+    }
+
+    public static void ThrowLoadException (string message, int errorCode, UMPWrapper wrapper)
+    {
+        wrapper.ScriptError($"UMP ERROR {errorCode}\n\n{message}");
     }
     
     public string GetObjectName (string entryName)
@@ -832,7 +910,7 @@ class UMPPatchFile
                         }
                         else
                         {
-                            Console.WriteLine(new UMPException(10, $"Error in patch file \"{entryName}\": Expected CODE command"));
+                            UMPLoader.ThrowLoadException($"Error in patch file \"{entryName}\": Expected CODE command", 22, Wrapper);
                         }
                     }
                     else if (Regex.IsMatch(line, @"\bEND\b"))
@@ -848,7 +926,7 @@ class UMPPatchFile
                     }
                     else
                     {
-                        Console.WriteLine(new UMPException(11, $"Error in patch file \"{entryName}\": Expected END command"));
+                        UMPLoader.ThrowLoadException($"Error in patch file \"{entryName}\": Expected END command", 23, Wrapper);
                     }
                 }
                 else
