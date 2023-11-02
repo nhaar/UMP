@@ -11,8 +11,7 @@ UMPWrapper UMP_WRAPPER = new UMPWrapper
     (string name, string code) => { ImportGMLString(name, code); return ""; },
     (string name, string code) => { ImportASMString(name, code); return ""; },
     (string name) => GetDisassemblyText(name),
-    (string name) => GetDecompiledText(name),
-    (string error) => { ScriptError(error); return ""; }
+    (string name) => GetDecompiledText(name)
 );
 
 abstract class UMPLoader
@@ -54,22 +53,19 @@ abstract class UMPLoader
         try
         {
             absoluteCodePath = Path.Combine(scriptDir, CodePath);
-
         }
-        catch (Exception e)
+        catch
         {
-            ThrowLoadException("Error getting code path", 1);
-            throw e;
+            throw new UMPException("Error getting code path");
         }
         string[] files = null;
         try
         {
             files = searchPatterns.SelectMany(pattern => Directory.GetFiles(absoluteCodePath, pattern, SearchOption.AllDirectories)).ToArray();
         }
-        catch (Exception e)
+        catch
         {
-            ThrowLoadException("Error getting code files", 2);
-            throw e;
+            throw new UMPException("Error getting code files");
         }
 
         Dictionary<string, string> processedFiles = new();
@@ -87,7 +83,7 @@ abstract class UMPLoader
                 string negativeCondition = Regex.Match(code, ifndefPattern).Value;
                 if (positiveCondition == negativeCondition && negativeCondition == "")
                 {
-                    ThrowLoadException($"Invalid \"ignore\" statement in file: {file}", 3);
+                    throw new UMPException($"Invalid \"ignore\" statement in file: {file}");
                 }
                 // ignore if the condition is met (based on the symbol)
                 if
@@ -137,13 +133,13 @@ abstract class UMPLoader
                             }
                             if (i >= code.Length)
                             {
-                                ThrowLoadException("Function keyword must be preceded by name and parenthesis, in file: " + file, 4);
+                                throw new UMPException("Function keyword must be preceded by name and parenthesis, in file: " + file);
                                 break;
                             }
                             string functionName = code.Substring(nameStart, i - nameStart).Trim();
                             if (!Regex.IsMatch(functionName, @"[\d][\d\w_]*"))
                             {
-                                ThrowLoadException("Function name must be a valid variable name, in file: " + file, 5);
+                                throw new UMPException("Function name must be a valid variable name, in file: " + file);
                                 break;
                             }
                             List<string> args = new();
@@ -164,7 +160,7 @@ abstract class UMPLoader
                             }
                             if (i >= code.Length)
                             {
-                                ThrowLoadException("Function arguments not closed, in file: " + file, 6);
+                                throw new UMPException("Function arguments not closed, in file: " + file);
                                 break;
                             }
                             while (i < code.Length && code[i] != '{')
@@ -173,7 +169,7 @@ abstract class UMPLoader
                             }
                             if (i >= code.Length)
                             {
-                                ThrowLoadException("Function body not found, in file: " + file, 7);
+                                throw new UMPException("Function body not found, in file: " + file);
                                 break;
                             }
                             int codeStart = i + 1;
@@ -192,7 +188,7 @@ abstract class UMPLoader
                             while (i < code.Length && depth > 0);
                             if (i >= code.Length)
                             {
-                                ThrowLoadException("Function body not closed, in file: " + file, 8);
+                                throw new UMPException("Function body not closed, in file: " + file);
                                 break;
                             }
                             // - 1 at the end to remove the last }
@@ -270,7 +266,7 @@ abstract class UMPLoader
             }
             else
             {
-                ThrowLoadException($"File \"{file}\" does not have a valid UMP type", 9);
+                throw new UMPException($"File \"{file}\" does not have a valid UMP type");
             }
         }
 
@@ -359,7 +355,7 @@ abstract class UMPLoader
                 {
                     if (command.OriginalCode == "")
                     {
-                        ThrowLoadException("Error in patch file: Replace command requires code to be specified (empty string found)", 10);
+                        throw new UMPException("Error in patch file: Replace command requires code to be specified (empty string found)");
                     }
                     patch.Code = patch.Code.Replace(command.OriginalCode, command.NewCode);
                 }
@@ -375,10 +371,9 @@ abstract class UMPLoader
                         {
                             AppendGML(entry.Name, command.NewCode);
                         }
-                        catch (System.Exception e)
+                        catch
                         {
-                            ThrowLoadException($"Error appending code to entry \"{entry.Name}\"", 11);
-                            throw e;
+                            throw new UMPException($"Error appending code to entry \"{entry.Name}\"");
                         }
                         if (patch.RequiresCompilation)
                         {
@@ -406,10 +401,9 @@ abstract class UMPLoader
                         Wrapper.Data.Code.ByName(entry.Name).ReplaceGML(patch.Code, Wrapper.Data);
                     }
                 }
-                catch (Exception e)
+                catch
                 {
-                    ThrowLoadException($"Error importing code entry \"{entry.Name}\"", 12);
-                    throw e;
+                    throw new UMPException($"Error patching code entry \"{entry.Name}\"");
                 }
             }
         }
@@ -483,7 +477,7 @@ abstract class UMPLoader
 
         public void ThrowStringException ()
         {
-            Loader.ThrowLoadException("String not closed in code", 13);
+            throw new UMPException("String not closed in code");
         }
 
         public bool Inbounds => Index < Code.Length;
@@ -551,7 +545,7 @@ abstract class UMPLoader
             }
             if (!Inbounds)
             {
-                Loader.ThrowLoadException("Preprocessing if block not closed in code", 14);
+                throw new UMPException("Preprocessing if block not closed in code");
             }
             if (Code.Substring(Index + 1, 5) == "endif")
             {
@@ -569,7 +563,7 @@ abstract class UMPLoader
             string symbol = SkipWordAhead();
             if (symbol == "")
             {
-                Loader.ThrowLoadException("No symbol found after if keyword", 15);
+                throw new UMPException("No symbol found after if keyword");
             }
             SkipLine();
             bool condition = Symbols?.Contains(symbol) ?? false;
@@ -594,7 +588,7 @@ abstract class UMPLoader
         {
             if (!Enums.ContainsKey(enumName))
             {
-                Loader.ThrowLoadException($"Enum \"{enumName}\" not found", 16);
+                throw new UMPException($"Enum \"{enumName}\" not found");
             }
             string word;
             // accessing enum property
@@ -608,7 +602,7 @@ abstract class UMPLoader
                 }
                 else
                 {
-                    Loader.ThrowLoadException("Invalid UMP enum property in code", 17);
+                    throw new UMPException("Invalid UMP enum property in code");
                 }
             }
             else
@@ -620,7 +614,7 @@ abstract class UMPLoader
                 }
                 else
                 {
-                    Loader.ThrowLoadException($"Enum value \"{word}\" not found in enum \"{enumName}\"", 18);
+                    throw new UMPException($"Enum value \"{word}\" not found in enum \"{enumName}\"");
                 }
             }
             Skip(word.Length);
@@ -647,14 +641,14 @@ abstract class UMPLoader
             }
             if (!Inbounds)
             {
-                Loader.ThrowLoadException("UMP Method not closed in code", 19);
+                throw new UMPException("UMP Method not closed in code");
             }
 
             // add error if wrong arg count, types and etc
             MethodInfo methodInfo = Loader.GetType().GetMethod(method);
             if (methodInfo == null)
             {
-                Loader.ThrowLoadException($"UMP Method \"{method}\" not found", 20);
+                throw new UMPException($"UMP Method \"{method}\" not found");
             }
             else
             {
@@ -663,10 +657,9 @@ abstract class UMPLoader
                     object result = methodInfo.Invoke(Loader, methodArgs.ToArray());
                     ProcessedCode += (string)result;
                 }
-                catch (Exception e)
+                catch
                 {
-                    Loader.ThrowLoadException($"UMP Method \"{method}\" failed", 21);
-                    throw e;
+                    throw new UMPException($"UMP Method \"{method}\" failed");
                 }
             }
         }
@@ -740,16 +733,6 @@ abstract class UMPLoader
             Symbols = loader.Symbols;
             Enums = loader.GetEnums();
         }
-    }
-
-    public void ThrowLoadException (string message, int errorCode)
-    {
-        Wrapper.ScriptError($"UMP ERROR {errorCode}\n\n{message}");
-    }
-
-    public static void ThrowLoadException (string message, int errorCode, UMPWrapper wrapper)
-    {
-        wrapper.ScriptError($"UMP ERROR {errorCode}\n\n{message}");
     }
     
     public string GetObjectName (string entryName)
@@ -915,7 +898,7 @@ class UMPPatchFile
                         }
                         else
                         {
-                            UMPLoader.ThrowLoadException($"Error in patch file \"{entryName}\": Expected CODE command", 22, Wrapper);
+                            throw new UMPException($"Error in patch file \"{entryName}\": Expected CODE command");
                         }
                     }
                     else if (Regex.IsMatch(line, @"\bEND\b"))
@@ -931,7 +914,7 @@ class UMPPatchFile
                     }
                     else
                     {
-                        UMPLoader.ThrowLoadException($"Error in patch file \"{entryName}\": Expected END command", 23, Wrapper);
+                        throw new UMPException($"Error in patch file \"{entryName}\": Expected END command");
                     }
                 }
                 else
@@ -1004,10 +987,9 @@ class UMPPatchFile
                 Code = Wrapper.GetDecompiledText(codeName);
             }
         }
-        catch (System.Exception e)
+        catch
         {
-            Console.WriteLine(new UMPException(12, $"Error decompiling code entry \"{codeName}\""));
-            throw e;
+            throw new UMPException($"Error decompiling code entry \"{codeName}\"");
         }
     }
 }
@@ -1108,7 +1090,7 @@ static class UMPCaseConverter
     {
         if (!IsPascalCase(name))
         {
-            Console.WriteLine(new UMPException(6, $"Original case must be pascal case for name \"{name}\""));
+            throw new UMPException($"Original case must be pascal case for name \"{name}\"");
         }
         switch (nameCase)
         {
@@ -1220,29 +1202,10 @@ static class UMPCaseConverter
     }
 }
 
-/// <summary>
-/// A documented UMP error
-/// </summary>
 public class UMPException : Exception
 {
-    /// <summary>
-    /// Error code of the error
-    /// </summary>
-    public int ErrorCode { get; }
-
-    /// <summary>
-    /// Create a new UMP error
-    /// </summary>
-    /// <param name="errorCode">Error code of the error</param>
-    /// <param name="message">Message to log</param>
-    public UMPException(int errorCode, string message) : base(message)
+    public UMPException(string message) : base(message)
     {
-        ErrorCode = errorCode;
-    }
-
-    public override string ToString()
-    {
-        return $"UMP ERROR #{ErrorCode.ToString("D4")}\n{Message}";
     }
 }
 
@@ -1261,8 +1224,6 @@ public class UMPWrapper
 
     public Func<string, string> GetDecompiledText;
 
-    public Func<string, string> ScriptError;
-
     public UMPWrapper
     (
         UndertaleData data,
@@ -1270,8 +1231,7 @@ public class UMPWrapper
         Func<string, string, string> importGMLString,
         Func<string, string, string> importASMString,
         Func<string, string> getDisassemblyText,
-        Func<string, string> getDecompiledText,
-        Func<string, string> scriptError
+        Func<string, string> getDecompiledText
     )
     {
         Data = data;
@@ -1280,6 +1240,5 @@ public class UMPWrapper
         ImportASMString = importASMString;
         GetDisassemblyText = getDisassemblyText;
         GetDecompiledText = getDecompiledText;
-        ScriptError = scriptError;
     }
 }
