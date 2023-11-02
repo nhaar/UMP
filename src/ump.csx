@@ -8,11 +8,7 @@ UMPWrapper UMP_WRAPPER = new UMPWrapper
 (
     Data,
     ScriptPath,
-    (string name) => UMPGetObjectName(name),
-    (string name) => { UMPCreateGMSObject(name); return ""; },
-    (UMPCodeEntry name) => { UMPImportCodeEntry(name); return ""; },
     (string name, string code) => { ImportGMLString(name, code); return ""; },
-    (string name, string code) => { UMPAppendGML(name, code); return ""; },
     (string name, string code) => { ImportASMString(name, code); return ""; },
     (string name) => { GetDisassemblyText(name); return ""; },
     (string name) => { GetDecompiledText(name); return ""; }
@@ -186,7 +182,7 @@ abstract class UMPLoader
                                 }
                                 functionCodeBlock = $"function {functionName}({string.Join(", ", gmlArgs)}) {{ {functionCodeBlock} }}";
                                 string entryName = UseGlobalScripts ? $"gml_GlobalScript_{functionName}" : $"gml_Script_{functionName}";
-                                functions.Add(new UMPFunctionEntry(entryName, functionCodeBlock, functionName, false));
+                                functions.Add(new UMPFunctionEntry(entryName, functionCodeBlock, functionName, false, Wrapper));
                             }
                         }
                         i++;
@@ -218,7 +214,7 @@ abstract class UMPLoader
                 
                 foreach (string codeName in codeEntries)
                 {
-                    UMPCodeEntry codeEntry = new UMPCodeEntry(codeName, code, isASM);
+                    UMPCodeEntry codeEntry = new UMPCodeEntry(codeName, code, isASM, Wrapper);
                     if (code.StartsWith("/// PATCH"))
                     {
                         patches.Add(codeEntry);
@@ -229,15 +225,15 @@ abstract class UMPLoader
                         {
                             string functionName = Regex.Match(codeName, @"(?<=(gml_Script_|gml_GlobalScript_))[_\d\w]+").Value;
 
-                            functions.Add(new UMPFunctionEntry(codeName, code, functionName, isASM));
+                            functions.Add(new UMPFunctionEntry(codeName, code, functionName, isASM, Wrapper));
                         }
                         else
                         {
                             // loader only supports scripts and objects... if not script, then it's an object
-                            string objName = Wrapper.UMPGetObjectName(codeName);
+                            string objName = GetObjectName(codeName);
                             if (objName != "" && Wrapper.Data.GameObjects.ByName(objName) == null)
                             {
-                                Wrapper.UMPCreateGMSObject(objName);
+                                CreateGameObject(objName);
                             }
                             imports.Add(codeEntry);
                         }
@@ -282,7 +278,7 @@ abstract class UMPLoader
         {
             if (UseGlobalScripts)
             {
-                Wrapper.UMPImportCodeEntry(entry);
+                entry.Import();
             }
             else
             {
@@ -308,7 +304,7 @@ abstract class UMPLoader
 
         foreach (UMPCodeEntry entry in imports)
         {
-            Wrapper.UMPImportCodeEntry(entry);
+            entry.Import();
         }
 
         foreach (UMPCodeEntry entry in patches)
@@ -345,7 +341,7 @@ abstract class UMPLoader
                     {
                         try
                         {
-                            Wrapper.UMPAppendGML(entry.Name, command.NewCode);
+                            AppendGML(entry.Name, command.NewCode);
                             
                         }
                         catch (System.Exception)
@@ -676,6 +672,25 @@ abstract class UMPLoader
             Enums = loader.GetEnums();
         }
     }
+    
+    public string GetObjectName (string entryName)
+    {
+        return Regex.Match(entryName, @"(?<=gml_Object_).*?((?=(_[a-zA-Z]+_\d+))|(?=_Collision))").Value;
+    }
+
+    public UndertaleGameObject CreateGameObject (string objectName)
+    {
+        var obj = new UndertaleGameObject();
+        obj.Name = Wrapper.Data.Strings.MakeString(objectName);
+        Wrapper.Data.GameObjects.Add(obj);
+
+        return obj;
+    }
+
+    public void AppendGML (string codeName, string code)
+    {
+        Wrapper.Data.Code.ByName(codeName).AppendGML(code, Wrapper.Data);
+    }
 }
 
 /// <summary>
@@ -922,24 +937,14 @@ class UMPPatchFile
 /// </summary>
 /// <param name="codeName"></param>
 /// <param name="code"></param>
-void UMPAppendGML (string codeName, string code)
-{
-    Data.Code.ByName(codeName).AppendGML(code, Data);
-}
+
 
 /// <summary>
 /// Create a game object with the given name
 /// </summary>
 /// <param name="objectName"></param>
 /// <returns></returns>
-UndertaleGameObject UMPCreateGMSObject (string objectName)
-{
-    var obj = new UndertaleGameObject();
-    obj.Name = Data.Strings.MakeString(objectName);
-    Data.GameObjects.Add(obj);
 
-    return obj;
-}
 
 /// <summary>
 /// Represents a code entry that will be added
@@ -951,11 +956,14 @@ public class UMPCodeEntry
 
     public bool IsASM { get; set; }
 
-    public UMPCodeEntry (string name, string code, bool isASM = false)
+    public UMPWrapper Wrapper { get; set; }
+
+    public UMPCodeEntry (string name, string code, bool isASM = false, UMPWrapper wrapper = null)
     {
         Name = name;
         Code = code;
         IsASM = isASM;
+        Wrapper = wrapper;
     }
 
     public override bool Equals(object obj)
@@ -979,22 +987,16 @@ public class UMPCodeEntry
 
     public void Import ()
     {
-
+        if (IsASM)
+        {
+            Wrapper.ImportASMString(Name, Code);
+        }
+        else
+        {
+            Wrapper.ImportGMLString(Name, Code);
+        }
     }
 }
-
-void UMPImportCodeEntry (UMPCodeEntry codeEntry)
-{
-    if (codeEntry.IsASM)
-    {
-        ImportASMString(codeEntry.Name, codeEntry.Code);
-    }
-    else
-    {
-        ImportGMLString(codeEntry.Name, codeEntry.Code);
-    }
-}
-
 
 /// <summary>
 /// Represents a code entry that is a function
@@ -1003,21 +1005,12 @@ class UMPFunctionEntry : UMPCodeEntry
 {
     public string FunctionName { get; set; }
 
-    public UMPFunctionEntry (string name, string code, string functionName, bool isASM) : base(name, code, isASM)
+    public UMPFunctionEntry (string name, string code, string functionName, bool isASM, UMPWrapper wrapper) : base(name, code, isASM, wrapper)
     {
         FunctionName = functionName;
     }
 }
 
-/// <summary>
-/// Get the name of the game object from a code entry that belongs to the object (in the UTMT code entry name format)
-/// </summary>
-/// <param name="entryName"></param>
-/// <returns></returns>
-string UMPGetObjectName (string entryName)
-{
-    return Regex.Match(entryName, @"(?<=gml_Object_).*?((?=(_[a-zA-Z]+_\d+))|(?=_Collision))").Value;
-}
 
 /// <summary>
 /// Handles converting from PASCAL CASE to other cases
@@ -1179,15 +1172,8 @@ public class UMPWrapper
 
     public string ScriptPath;
 
-    public Func<string, string> UMPGetObjectName;
-
-    public Func<string, string> UMPCreateGMSObject;
-
-    public Func<UMPCodeEntry, string> UMPImportCodeEntry;
-
     public Func<string, string, string> ImportGMLString;
 
-    public Func<string, string, string> UMPAppendGML;
 
     public Func<string, string, string> ImportASMString;
 
@@ -1199,11 +1185,7 @@ public class UMPWrapper
     (
         UndertaleData data,
         string scriptPath,
-        Func<string, string> umpGetObjectName,
-        Func<string, string> umpCreateGMSObject,
-        Func<UMPCodeEntry, string> umpImportCodeEntry,
         Func<string, string, string> importGMLString,
-        Func<string, string, string> umpAppendGML,
         Func<string, string, string> importASMString,
         Func<string, string> getDisassemblyText,
         Func<string, string> getDecompiledText
@@ -1211,11 +1193,7 @@ public class UMPWrapper
     {
         Data = data;
         ScriptPath = scriptPath;
-        UMPGetObjectName = umpGetObjectName;
-        UMPCreateGMSObject = umpCreateGMSObject;
-        UMPImportCodeEntry = umpImportCodeEntry;
         ImportGMLString = importGMLString;
-        UMPAppendGML = umpAppendGML;
         ImportASMString = importASMString;
         GetDisassemblyText = getDisassemblyText;
         GetDecompiledText = getDecompiledText;
