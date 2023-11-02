@@ -7,7 +7,9 @@ using System.Linq;
 UMPWrapper UMP_WRAPPER = new UMPWrapper
 (
     Data,
-    ScriptPath
+    ScriptPath,
+    (string name) => UMPGetObjectName(name),
+    (string name) => { UMPCreateGMSObject(name); return ""; }
 );
 
     // string modPath = null, -> CodePath
@@ -95,6 +97,160 @@ abstract class UMPLoader
             }
 
             UMPLoader.CodeProcessor processor = new(code, this);
+            string processedCode = processor.Preprocess();
+            string relativePath = Path.GetRelativePath(CodePath, file);
+            processedFiles[relativePath] = processedCode;
+        }
+
+        List<UMPFunctionEntry> functions = new();
+        List<UMPCodeEntry> imports = new();
+        List<UMPCodeEntry> patches = new();
+
+        // post processing
+        foreach (string file in processedFiles.Keys)
+        {
+            string code = processedFiles[file];
+            // "opening" function files
+            if (code.StartsWith("/// FUNCTIONS"))
+            {
+                try
+                {    
+                    string currentFunction = "";
+                    int i = 0;
+                    int start = 0;
+                    int depth = 0;
+                    while (i < code.Length)
+                    {
+                        char c = code[i];
+                        if (c == 'f')
+                        {
+                            if (code.Substring(i, 8) == "function")
+                            {
+                                start = i;
+                                i += 8;
+                                int nameStart = i;
+                                while (code[i] != '(')
+                                {
+                                    i++;
+                                }
+                                string functionName = code.Substring(nameStart, i - nameStart).Trim();
+                                List<string> args = new();
+                                nameStart = i + 1;
+                                while (true)
+                                {
+                                    bool endLoop = code[i] == ')';
+                                    if (code[i] == ',' || endLoop)
+                                    {
+                                        string argName = code.Substring(nameStart, i - nameStart).Trim();
+                                        if (argName != "")
+                                            args.Add(argName);
+                                        nameStart = i + 1;
+                                        if (endLoop)
+                                            break;
+                                    }
+                                    i++;
+                                }
+                                while (code[i] != '{')
+                                {
+                                    i++;
+                                }
+                                int codeStart = i + 1;
+                                do
+                                {
+                                    if (code[i] == '{')
+                                    {
+                                        depth++;
+                                    }
+                                    else if (code[i] == '}')
+                                    {
+                                        depth--;
+                                    }
+                                    i++;
+                                }
+                                while (depth > 0);
+                                // - 1 at the end to remove the last }
+                                string functionCodeBlock = code.Substring(codeStart, i - codeStart - 1);
+
+                                
+                                List<string> gmlArgs = new();
+                                // initializing args, unless they are argumentN in gamemaker because those already work normally
+                                for (int j = 0; j < args.Count; j++)
+                                {
+                                    gmlArgs.Add("argument" + j);
+                                    string arg = args[j];
+                                    if (arg.StartsWith("argument"))
+                                    {
+                                        continue;
+                                    }
+                                    else
+                                    {
+                                        functionCodeBlock = $"var {arg} = argument{j};" + functionCodeBlock;
+                                    }
+                                }
+                                functionCodeBlock = $"function {functionName}({string.Join(", ", gmlArgs)}) {{ {functionCodeBlock} }}";
+                                string entryName = UseGlobalScripts ? $"gml_GlobalScript_{functionName}" : $"gml_Script_{functionName}";
+                                functions.Add(new UMPFunctionEntry(entryName, functionCodeBlock, functionName, false));
+                            }
+                        }
+                        i++;
+                    }
+                }
+                catch (System.Exception e)
+                {                
+                    Console.WriteLine(new UMPException(16, $"Error processing functions in file \"{file}\""));
+                }
+            }
+            else if (Regex.IsMatch(code, @"^/// (IMPORT|PATCH)"))
+            {
+                string[] codeEntries = GetCodeNames(file);
+                bool isASM = file.EndsWith(".asm");
+
+                for (int i = 0; i < codeEntries.Length; i++)
+                {
+                    if (UseGlobalScripts)
+                    {
+                        codeEntries[i] = codeEntries[i].Replace("gml_Script", "gml_GlobalScript");
+                    }
+                    else
+                    {
+                        codeEntries[i] = codeEntries[i].Replace("gml_GlobalScript", "gml_Script");
+                    }
+
+                }
+
+                
+                foreach (string codeName in codeEntries)
+                {
+                    UMPCodeEntry codeEntry = new UMPCodeEntry(codeName, code, isASM);
+                    if (code.StartsWith("/// PATCH"))
+                    {
+                        patches.Add(codeEntry);
+                    }
+                    else
+                    {
+                        if (codeName.Contains("gml_GlobalScript") || codeName.Contains("gml_Script"))
+                        {
+                            string functionName = Regex.Match(codeName, @"(?<=(gml_Script_|gml_GlobalScript_))[_\d\w]+").Value;
+
+                            functions.Add(new UMPFunctionEntry(codeName, code, functionName, isASM));
+                        }
+                        else
+                        {
+                            // loader only supports scripts and objects... if not script, then it's an object
+                            string objName = Wrapper.UMPGetObjectName(codeName);
+                            if (objName != "" && Wrapper.Data.GameObjects.ByName(objName) == null)
+                            {
+                                Wrapper.UMPCreateGMSObject(objName);
+                            }
+                            imports.Add(codeEntry);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine(new UMPException(9, $"File \"{file}\" does not have a valid UMP type"));
+            }
         }
     }
 
@@ -1419,13 +1575,21 @@ public class UMPWrapper
 
     public string ScriptPath;
 
+    public Func<string, string> UMPGetObjectName;
+
+    public Func<string, string> UMPCreateGMSObject;
+
     public UMPWrapper
     (
         UndertaleData data,
-        string scriptPath
+        string scriptPath,
+        Func<string, string> umpGetObjectName,
+        Func<string, string> umpCreateGMSObject
     )
     {
         Data = data;
         ScriptPath = scriptPath;
+        UMPGetObjectName = umpGetObjectName;
+        UMPCreateGMSObject = umpCreateGMSObject;
     }
 }
