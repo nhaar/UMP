@@ -25,3 +25,10 @@ before_command = true
 /// APPEND
 appended = true
 /// END
+
+// testing enum
+/// APPEND
+enum_value1 = #TestEnum2.Test1 
+enum_value2 = #TestEnum.Test3
+enum_value3 = #TestEnum.#length
+/// END

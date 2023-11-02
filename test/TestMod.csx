@@ -17,6 +17,20 @@ class TestLoader : UMPLoader
         return new[] { fileName };
     }
 
+    public enum TestEnum
+    {
+        Test1,
+        Test2,
+        Test3 = 80
+    }
+
+    public enum TestEnum2
+    {
+        Test1,
+        Test2,
+        Test3
+    }
+
     public TestLoader (UMPWrapper wrapper) : base(wrapper) {}
 }
 
