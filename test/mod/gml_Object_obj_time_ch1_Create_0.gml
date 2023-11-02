@@ -1,8 +1,10 @@
 /// PATCH
 
+#if TEST
 /// PREPEND
 prepended = true
 /// END
+#endif
 
 /// REPLACE
 quit_timer = 0

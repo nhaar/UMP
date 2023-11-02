@@ -1,10 +1,8 @@
 #load "..\src\ump.csx"
 
-class TestLoader : UMPLoader
+abstract class TestLoaderBase : UMPLoader
 {
     public override string CodePath => "mod/";
-
-    public override bool UseGlobalScripts => true;
 
     public override string[] GetCodeNames (string filePath)
     {
@@ -36,8 +34,5 @@ class TestLoader : UMPLoader
         return "Test" + arg1 + arg2;
     }
 
-    public TestLoader (UMPWrapper wrapper) : base(wrapper) {}
+    public TestLoaderBase (UMPWrapper wrapper) : base(wrapper) {}
 }
-
-TestLoader testLoader = new TestLoader(UMP_WRAPPER);
-testLoader.Load();
