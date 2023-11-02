@@ -643,6 +643,8 @@ abstract class UMPLoader
             {
                 throw new UMPException("UMP Method not closed in code");
             }
+            // closing parenthesis
+            Skip();
 
             // add error if wrong arg count, types and etc
             MethodInfo methodInfo = Loader.GetType().GetMethod(method);
