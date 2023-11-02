@@ -27,10 +27,6 @@ abstract class UMPLoader
 
     public string AbsoluteCodePath { get; set; }
 
-    public virtual UMPCaseConverter.NameCase EnumNameCase { get; set; } = UMPCaseConverter.NameCase.PascalCase;
-
-    public virtual UMPCaseConverter.NameCase EnumMemberCase { get; set; } = UMPCaseConverter.NameCase.PascalCase;
-
     public string[] Symbols { get; set; } = null;
 
     public bool UseGlobalScripts { get; set; }
@@ -56,25 +52,6 @@ abstract class UMPLoader
             {
                 Dictionary<string, int> values = Enum.GetNames(nestedType).ToDictionary(name => name, name => (int)Enum.Parse(nestedType, name));
                 enumValues[nestedType.Name] = values;
-            }
-        }
-
-        if (EnumNameCase != UMPCaseConverter.NameCase.PascalCase)
-        {
-            string[] keys = enumValues.Keys.ToArray();
-            foreach (string enumName in keys)
-            {
-                string newName = UMPCaseConverter.Convert(enumNameCase, enumName);
-                enumValues.Add(newName, enumValues[enumName]);
-                enumValues.Remove(enumName);
-            }
-        }
-        if (EnumMemberCase != UMPCaseConverter.NameCase.PascalCase)
-        {
-            foreach (string enumName in enumValues.Keys.ToList())
-            {
-                enumValues[enumName] = enumValues[enumName]
-                    .ToDictionary(pair => UMPCaseConverter.Convert(enumMemberCase, pair.Key), pair => pair.Value);
             }
         }
 
