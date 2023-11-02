@@ -10,8 +10,8 @@ UMPWrapper UMP_WRAPPER = new UMPWrapper
     ScriptPath,
     (string name, string code) => { ImportGMLString(name, code); return ""; },
     (string name, string code) => { ImportASMString(name, code); return ""; },
-    (string name) => { GetDisassemblyText(name); return ""; },
-    (string name) => { GetDecompiledText(name); return ""; },
+    (string name) => GetDisassemblyText(name),
+    (string name) => GetDecompiledText(name),
     (string error) => { ScriptError(error); return ""; }
 );
 
