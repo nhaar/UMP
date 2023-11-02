@@ -14,7 +14,6 @@ UMPWrapper UMP_WRAPPER = new UMPWrapper
     (string name) => { GetDecompiledText(name); return ""; }
 );
 
-
 abstract class UMPLoader
 {
     public abstract string CodePath { get; }
@@ -24,7 +23,6 @@ abstract class UMPLoader
     public abstract string[] GetCodeNames (string filePath);
 
     public UMPWrapper Wrapper { get; set; }
-    public string AbsoluteCodePath { get; set; }
     public UMPLoader (UMPWrapper wrapper)
     {
         Wrapper = wrapper;
@@ -50,8 +48,8 @@ abstract class UMPLoader
     {
         string[] searchPatterns = new[] { "*.gml", "*.asm" };
         string scriptDir = Path.GetDirectoryName(Wrapper.ScriptPath);
-        AbsoluteCodePath = Path.Combine(scriptDir, CodePath);
-        string[] files = searchPatterns.SelectMany(pattern => Directory.GetFiles(AbsoluteCodePath, pattern, SearchOption.AllDirectories)).ToArray();
+        string absoluteCodePath = Path.Combine(scriptDir, CodePath);
+        string[] files = searchPatterns.SelectMany(pattern => Directory.GetFiles(absoluteCodePath, pattern, SearchOption.AllDirectories)).ToArray();
 
         Dictionary<string, string> processedFiles = new();
 
@@ -83,7 +81,7 @@ abstract class UMPLoader
 
             UMPLoader.CodeProcessor processor = new(code, this);
             string processedCode = processor.Preprocess();
-            string relativePath = Path.GetRelativePath(AbsoluteCodePath, file);
+            string relativePath = Path.GetRelativePath(absoluteCodePath, file);
             processedFiles[relativePath] = processedCode;
         }
 
