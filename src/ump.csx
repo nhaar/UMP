@@ -11,7 +11,8 @@ UMPWrapper UMP_WRAPPER = new UMPWrapper
     (string name, string code) => { ImportGMLString(name, code); return ""; },
     (string name, string code) => { ImportASMString(name, code); return ""; },
     (string name) => { GetDisassemblyText(name); return ""; },
-    (string name) => { GetDecompiledText(name); return ""; }
+    (string name) => { GetDecompiledText(name); return ""; },
+    (string error) => { ScriptError(error); return ""; }
 );
 
 abstract class UMPLoader
@@ -662,6 +663,11 @@ abstract class UMPLoader
             Enums = loader.GetEnums();
         }
     }
+
+    public void ThrowLoadException (string message, int errorCode)
+    {
+        Wrapper.ScriptError($"UMP ERROR {errorCode}\n\n{message}");
+    }
     
     public string GetObjectName (string entryName)
     {
@@ -1171,6 +1177,8 @@ public class UMPWrapper
 
     public Func<string, string> GetDecompiledText;
 
+    public Func<string, string> ScriptError;
+
     public UMPWrapper
     (
         UndertaleData data,
@@ -1178,7 +1186,8 @@ public class UMPWrapper
         Func<string, string, string> importGMLString,
         Func<string, string, string> importASMString,
         Func<string, string> getDisassemblyText,
-        Func<string, string> getDecompiledText
+        Func<string, string> getDecompiledText,
+        Func<string, string> scriptError
     )
     {
         Data = data;
@@ -1187,5 +1196,6 @@ public class UMPWrapper
         ImportASMString = importASMString;
         GetDisassemblyText = getDisassemblyText;
         GetDecompiledText = getDecompiledText;
+        ScriptError = scriptError;
     }
 }
