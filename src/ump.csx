@@ -309,7 +309,7 @@ abstract class UMPLoader
             }
             else
             {
-                string functionBody = Regex.Match(entry.Code, @"(?<=^\s*function[\s\d\w_]+\(.*?\)\s*{)[\s\S]+(?=}\s*$)").Value;
+                string functionBody = Regex.Match(entry.Code, @"(?<=^[\S\s]*?function[\s\d\w_]+\(.*?\)\s*{)[\s\S]+(?=}\s*$)").Value;
                 // if the script was defined without "function"
                 if (functionBody == "")
                 {
