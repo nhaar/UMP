@@ -56,18 +56,20 @@ abstract class UMPLoader
             absoluteCodePath = Path.Combine(scriptDir, CodePath);
 
         }
-        catch
+        catch (Exception e)
         {
             ThrowLoadException("Error getting code path", 1);
+            throw e;
         }
         string[] files = null;
         try
         {
             files = searchPatterns.SelectMany(pattern => Directory.GetFiles(absoluteCodePath, pattern, SearchOption.AllDirectories)).ToArray();
         }
-        catch
+        catch (Exception e)
         {
             ThrowLoadException("Error getting code files", 2);
+            throw e;
         }
 
         Dictionary<string, string> processedFiles = new();
@@ -373,9 +375,10 @@ abstract class UMPLoader
                         {
                             AppendGML(entry.Name, command.NewCode);
                         }
-                        catch (System.Exception)
+                        catch (System.Exception e)
                         {
                             ThrowLoadException($"Error appending code to entry \"{entry.Name}\"", 11);
+                            throw e;
                         }
                         if (patch.RequiresCompilation)
                         {
@@ -660,9 +663,10 @@ abstract class UMPLoader
                     object result = methodInfo.Invoke(Loader, methodArgs.ToArray());
                     ProcessedCode += (string)result;
                 }
-                catch
+                catch (Exception e)
                 {
                     Loader.ThrowLoadException($"UMP Method \"{method}\" failed", 21);
+                    throw e;
                 }
             }
         }
