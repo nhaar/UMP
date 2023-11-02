@@ -31,6 +31,11 @@ class TestLoader : UMPLoader
         Test3
     }
 
+    public string TestMethod (string arg1, string arg2)
+    {
+        return "Test" + arg1 + arg2;
+    }
+
     public TestLoader (UMPWrapper wrapper) : base(wrapper) {}
 }
 
