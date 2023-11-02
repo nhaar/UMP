@@ -4,6 +4,8 @@ class TestLoader : UMPLoader
 {
     public override string CodePath => "mod/";
 
+    public override bool UseGlobalScripts => true;
+
     public override string[] GetCodeNames (string filePath)
     {
         string fileName = Path.GetFileNameWithoutExtension(filePath);
@@ -15,8 +17,8 @@ class TestLoader : UMPLoader
         return new[] { fileName };
     }
 
-    public TestLoader (UMPWrapper wrapper, string[] symbols, bool useGlobalScripts) : base(wrapper, symbols, useGlobalScripts) {}
+    public TestLoader (UMPWrapper wrapper) : base(wrapper) {}
 }
 
-TestLoader testLoader = new TestLoader(UMP_WRAPPER, new string[] {}, false);
+TestLoader testLoader = new TestLoader(UMP_WRAPPER);
 testLoader.Load();

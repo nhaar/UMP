@@ -17,26 +17,18 @@ UMPWrapper UMP_WRAPPER = new UMPWrapper
 
 abstract class UMPLoader
 {
-    public UMPWrapper Wrapper { get; set; }
-
     public abstract string CodePath { get; }
+    public abstract bool UseGlobalScripts { get; }
+    public virtual string[] Symbols { get; } = null;
+    public virtual bool EnableCache { get; } = false;
+    public abstract string[] GetCodeNames (string filePath);
 
+    public UMPWrapper Wrapper { get; set; }
     public string AbsoluteCodePath { get; set; }
-
-    public string[] Symbols { get; set; } = null;
-
-    public bool UseGlobalScripts { get; set; }
-
-    public bool EnableCache { get; set; } = true;
-
-    public UMPLoader (UMPWrapper wrapper, string[] symbols, bool useGlobalScripts)
+    public UMPLoader (UMPWrapper wrapper)
     {
         Wrapper = wrapper;
-        Symbols = symbols;
-        UseGlobalScripts = useGlobalScripts;
     }
-
-    public abstract string[] GetCodeNames (string filePath);
 
     public Dictionary<string, Dictionary<string, int>> GetEnums ()
     {
@@ -81,8 +73,8 @@ abstract class UMPLoader
                 // ignore if the condition is met (based on the symbol)
                 if
                 (
-                    (positiveCondition != "" && Symbols.Contains(positiveCondition)) ||
-                    (negativeCondition != "" && !Symbols.Contains(negativeCondition))
+                    (positiveCondition != "" && (Symbols?.Contains(positiveCondition) ?? false)) ||
+                    (negativeCondition != "" && (!Symbols?.Contains(negativeCondition) ?? true))
                 )
                 {
                     continue;
@@ -519,7 +511,7 @@ abstract class UMPLoader
             string symbol = SkipWordAhead();
             // ADD error for no symbol
             SkipLine();
-            bool condition = Symbols.Contains(symbol);
+            bool condition = Symbols?.Contains(symbol) ?? false;
             SkipWhitespace();
             TraverseIfBlock(condition);
         }
