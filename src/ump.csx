@@ -102,12 +102,14 @@ abstract class UMPLoader
         {
             throw new UMPException("Error getting code path");
         }
+
         string[] files = null;
-        try
+        string[] searchPatterns = new[] { "*.gml", "*.asm" };
+        if (Directory.Exists(absoluteCodePath))
         {
             files = searchPatterns.SelectMany(pattern => Directory.GetFiles(absoluteCodePath, pattern, SearchOption.AllDirectories)).ToArray();
         }
-        catch
+        else
         {
             throw new UMPException("Error getting code files");
         }
