@@ -43,7 +43,7 @@ abstract class UMPLoader
     /// <param name="filePath">Path to the file, relative to the directory where the main script is</param>
     /// <returns>An array with all the code entries</returns>
     public abstract string[] GetCodeNames (string filePath);
-
+    
     // TO-DO: implement cache
     public virtual bool EnableCache { get; } = false;
 
@@ -116,34 +116,19 @@ abstract class UMPLoader
 
         Dictionary<string, string> processedFiles = new();
 
-        // preprocessing
+        // preprocessing code (everything using #)
         foreach (string file in files)
         {
             string code = File.ReadAllText(file);
             // ignoring files
-            if (Regex.IsMatch(code, @"^///.*?\.ignore"))
+            if (ShouldIgnoreFile(code, file))
             {
-                string ifPattern = @"(?<=^///.*?\.ignore\s+if\s+)[\d\w_]+";
-                string ifndefPattern = ifPattern.Replace("if", "ifndef");
-                string positiveCondition = Regex.Match(code, ifPattern).Value;
-                string negativeCondition = Regex.Match(code, ifndefPattern).Value;
-                if (positiveCondition == negativeCondition && negativeCondition == "")
-                {
-                    throw new UMPException($"Invalid \"ignore\" statement in file: {file}");
-                }
-                // ignore if the condition is met (based on the symbol)
-                if
-                (
-                    (positiveCondition != "" && (Symbols?.Contains(positiveCondition) ?? false)) ||
-                    (negativeCondition != "" && (!Symbols?.Contains(negativeCondition) ?? true))
-                )
-                {
-                    continue;
-                }
+                continue;
             }
 
             UMPLoader.CodeProcessor processor = new(code, this);
             string processedCode = processor.Preprocess();
+
             string relativePath = Path.GetRelativePath(absoluteCodePath, file);
             processedFiles[relativePath] = processedCode;
         }
@@ -453,6 +438,38 @@ abstract class UMPLoader
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Whether the file should be ignored or not, based on its code
+    /// </summary>
+    /// <param name="code">Code of the file</param>
+    /// <param name="file">File path, for debugging only</param>
+    /// <returns>True if it should be ignored</returns>
+    /// <exception cref="UMPException">If the ignore statement is malformed</exception>
+    public bool ShouldIgnoreFile (string code, string file)
+    {
+        if (!Regex,ISMatch(code, @"^///.*?\.ignore"))
+        {
+            return false;
+        }
+
+        string ifPattern = @"(?<=^///.*?\.ignore\s+if\s+)[\d\w_]+";
+        string ifndefPattern = ifPattern.Replace("if", "ifndef");
+        string positiveCondition = Regex.Match(code, ifPattern).Value;
+        string negativeCondition = Regex.Match(code, ifndefPattern).Value;
+
+        if (positiveCondition == negativeCondition && negativeCondition == "")
+        {
+            throw new UMPException($"Invalid \"ignore\" statement in file: {file}");
+        }
+
+        // ignore if the condition is met (based on the symbol)
+        return 
+        (
+            (positiveCondition != "" && Symbols?.Contains(positiveCondition) == true) ||
+            (negativeCondition != "" && !Symbols?.Contains(negativeCondition) == true)
+        )
     }
 
     public class CodeProcessor
