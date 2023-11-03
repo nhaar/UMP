@@ -3,6 +3,7 @@
 #if TEST
 /// PREPEND
 prepended = true
+show_debug_message(#TestEnum.Test2)
 /// END
 #endif
 
