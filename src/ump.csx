@@ -652,24 +652,40 @@ abstract class UMPLoader
         public void ProcessMethod (string method)
         {
             List<object> methodArgs = new();
-            // TO-DO: require arguments to be comma separated
             while (Inbounds && CurrentChar != ')')
             {
+                bool addedArg = false;
                 if (CurrentChar == '"')
                 {
                     methodArgs.Add(SkipString());
+                    addedArg = true;
                 }
                 // add support for more types: mainly INT and float
                 else if (Code.Substring(Index, 2) == "@@")
                 {
                     methodArgs.Add(GetGMLArgument());
+                    addedArg = true;
                 }
                 else
                 {
-                   Skip();
+                   throw new UMPException($"Invalid UMP method argument in code: {CurrentChar}");
                 }
+                if (addedArg)
+                {
+                    SkipWhitespace();
+                    if (!Regex.IsMatch(CurrentChar.ToString(), @"[,\)]"))
+                    {
+                        throw new UMPException("Invalid UMP method argument in code");
+                    }
+                    else if (CurrentChar == ',')
+                    {
+                        Skip();
+                        SkipWhitespace();
+                    }
+                }
+
             }
-            if (!Inbounds)
+            if (CurrentChar != ')')
             {
                 throw new UMPException("UMP Method not closed in code");
             }
