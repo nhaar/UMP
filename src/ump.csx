@@ -449,8 +449,9 @@ abstract class UMPLoader
         /// <summary>
         /// Skip current string
         /// </summary>
-        public void SkipString ()
+        public string SkipString ()
         {
+            int start = Index;
             Skip();
             while (CurrentChar != '"')
             {
@@ -465,6 +466,7 @@ abstract class UMPLoader
                 ThrowStringException();   
             }
             Skip();
+            return Code.Substring(start + 1, Index - start - 2);
         }
 
         /// <summary>
@@ -613,6 +615,35 @@ abstract class UMPLoader
             Skip(word.Length);
         }
 
+        public string GetGMLArgument ()
+        {
+            string arg = "";
+            Skip("@@".Length);
+            while (Inbounds && Code.Substring(Index, 2) != "$$")
+            {
+                if (CurrentChar == '"')
+                {
+                    arg += SkipString();
+                }
+                else if (Code.Substring(Index, 2) == "//")
+                {
+                    SkipLine();
+                }
+                else
+                {
+                    arg += CurrentChar;
+                    Skip();
+                }
+            }
+            if (!Inbounds)
+            {
+                throw new UMPException("GML argument not closed in code");
+            }
+
+            Skip("$$".Length);
+            return arg;
+        }
+
         /// <summary>
         /// Process code for a UMP method
         /// </summary>
@@ -626,12 +657,13 @@ abstract class UMPLoader
             {
                 if (CurrentChar == '"')
                 {
-                    int start = Index;
-                    SkipString();
-                    string str = Code.Substring(start + 1, Index - start - 2);
-                    methodArgs.Add(str);
+                    methodArgs.Add(SkipString());
                 }
                 // add support for more types: mainly INT and float
+                else if (Code.Substring(Index, 2) == "@@")
+                {
+                    methodArgs.Add(GetGMLArgument());
+                }
                 else
                 {
                    Skip();
