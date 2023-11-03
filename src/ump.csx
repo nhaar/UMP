@@ -4,6 +4,9 @@ using System.Reflection;
 using Newtonsoft.Json;
 using System.Linq;
 
+/// <summary>
+/// Wrapper for the IScriptInterface methods
+/// </summary>
 UMPWrapper UMP_WRAPPER = new UMPWrapper
 (
     Data,
@@ -14,25 +17,61 @@ UMPWrapper UMP_WRAPPER = new UMPWrapper
     (string name) => GetDecompiledText(name)
 );
 
+/// <summary>
+/// Base class for the GameMaker files (and disassembly files) loaders
+/// </summary>
 abstract class UMPLoader
 {
+    /// <summary>
+    /// The path to the folder containing the code files, relative to the directory the main script lies in
+    /// </summary>
     public abstract string CodePath { get; }
+
+    /// <summary>
+    /// Whether the scripts should be imported as global scripts (for GMS 2.3 and higher) or not (lower than GMS 2.3)
+    /// </summary>
     public abstract bool UseGlobalScripts { get; }
+
+    /// <summary>
+    /// A list of all the defined symbols, if any
+    /// </summary>
     public virtual string[] Symbols { get; } = null;
-    public virtual bool EnableCache { get; } = false;
+
+    /// <summary>
+    /// A function that takes a path (relative to the main script folder) to a code file and returns the names of the code entries that should be imported from it as an array
+    /// </summary>
+    /// <param name="filePath">Path to the file, relative to the directory where the main script is</param>
+    /// <returns>An array with all the code entries</returns>
     public abstract string[] GetCodeNames (string filePath);
 
+    // TO-DO: implement cache
+    public virtual bool EnableCache { get; } = false;
+
+    /// <summary>
+    /// The IScriptInterface wrapper that is being used
+    /// </summary>
     public UMPWrapper Wrapper { get; set; }
+
+    /// <summary>
+    /// Creates a new UMPLoader
+    /// </summary>
+    /// <param name="wrapper">Should be UMP_WRAPPER</param>
     public UMPLoader (UMPWrapper wrapper)
     {
         Wrapper = wrapper;
     }
 
+    /// <summary>
+    /// Returns a dictionary with all the enums defined in the loader
+    /// </summary>
+    /// <returns>
+    /// A dictionary with the vakues. It takes the form of two dictionaries nested dictionaries: string -> string -> int, where the first string is the name of the enum, the second string is the name of the enum value and the int is the value of the enum
+    /// </returns>
     public Dictionary<string, Dictionary<string, int>> GetEnums ()
     {
         Dictionary<string, Dictionary<string, int>> enumValues = new();
         // going until UMPLoader is equivalent to getting all user defined classes
-        for (Type classType = this.GetType(); !classType.Name.Contains("UMPLoader"); classType = classType.BaseType)
+        for (Type classType = this.GetType(); classType != typeof(UMPLoader); classType = classType.BaseType)
         {
             foreach (Type nestedType in classType.GetNestedTypes())
             {
