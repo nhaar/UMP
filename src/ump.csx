@@ -969,7 +969,7 @@ abstract class UMPLoader
                         throw new UMPException("Function keyword must be preceded by name and parenthesis, in file: " + File);
                     }
                     string functionName = Code.Substring(nameStart, Index - nameStart).Trim();
-                    if (!Regex.IsMatch(functionName, @"[\d][\d\w_]*"))
+                    if (!Regex.IsMatch(functionName, @"[\w_][\d\w_]*"))
                     {
                         throw new UMPException("Function name must be a valid variable name, in file: " + File);
                     }
