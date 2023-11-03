@@ -243,7 +243,6 @@ abstract class UMPLoader
                 }
                 string scriptName = entry.FunctionName;
                 string codeName = entry.Name.Replace("gml_GlobalScript", "gml_Script");
-                UndertaleCode scriptCode = null;
                 if (Wrapper.Data.Scripts.ByName(scriptName) == null)
                 {
                     Wrapper.ImportGMLString(codeName, functionBody);
@@ -265,7 +264,7 @@ abstract class UMPLoader
             UMPPatchFile patch = new UMPPatchFile(entry.Code, entry.Name, entry.IsASM, Wrapper);
             if (patch.RequiresCompilation)
             {
-                patch.UMPAddCodeToPatch(entry.Name);
+                patch.AddCode(entry.Name);
             }
 
             foreach (UMPPatchCommand command in patch.Commands)
@@ -306,7 +305,7 @@ abstract class UMPLoader
                         }
                         if (patch.RequiresCompilation)
                         {
-                            patch.UMPAddCodeToPatch(entry.Name);
+                            patch.AddCode(entry.Name);
                         }
                     }
                 }
@@ -370,23 +369,49 @@ abstract class UMPLoader
         );
     }
 
+    /// <summary>
+    /// Process GML code with UMP options
+    /// </summary>
     public class CodeProcessor
     {
+        /// <summary>
+        /// Code before processing
+        /// </summary>
         public string Code { get; set; }
 
+        /// <summary>
+        /// The UMPLoader that is being used for the options
+        /// </summary>
         public UMPLoader Loader { get; set; }
 
+        /// <summary>
+        /// All the enums defined in the loader
+        /// </summary>
         public Dictionary<string, Dictionary<string ,int>> Enums { get; set; }
 
+        /// <summary>
+        /// All the symbols defined in the loader
+        /// </summary>
         public string[] Symbols { get; set; }
 
+        /// <summary>
+        /// Current index in the code
+        /// </summary>
         public int Index { get; set; }
 
+        /// <summary>
+        /// Skip an amount of characters
+        /// </summary>
+        /// <param name="amount"></param>
         public void Skip (int amount = 1)
         {
             Index += amount;
         }
 
+        /// <summary>
+        /// Skip an amount of characters, adding them to the processed code
+        /// </summary>
+        /// <param name="amount"></param>
         public void Advance (int amount = 1)
         {
             int i = 0;
@@ -398,8 +423,14 @@ abstract class UMPLoader
             }
         }
 
+        /// <summary>
+        /// Current character in the code
+        /// </summary>
         public char CurrentChar => Code[Index];
 
+        /// <summary>
+        /// Skip current string and add it to the processed code
+        /// </summary>
         public void AddString ()
         {
             Advance();
@@ -418,6 +449,9 @@ abstract class UMPLoader
             Advance();
         }
 
+        /// <summary>
+        /// Skip current string
+        /// </summary>
         public void SkipString ()
         {
             Skip();
@@ -436,13 +470,23 @@ abstract class UMPLoader
             Skip();
         }
 
+        /// <summary>
+        /// Throw an exception for an unclosed string
+        /// </summary>
+        /// <exception cref="UMPException"></exception>
         public void ThrowStringException ()
         {
             throw new UMPException("String not closed in code");
         }
 
+        /// <summary>
+        /// Whether the index is inbounds or not
+        /// </summary>
         public bool Inbounds => Index < Code.Length;
 
+        /// <summary>
+        /// Skip a comment and add it to the processed code
+        /// </summary>
         public void AddComment ()
         {
             Advance(2);
@@ -453,6 +497,9 @@ abstract class UMPLoader
             Advance();
         }
 
+        /// <summary>
+        /// Skip all of current whitespace
+        /// </summary>
         public void SkipWhitespace ()
         {
             while (Inbounds && char.IsWhiteSpace(CurrentChar))
@@ -461,23 +508,22 @@ abstract class UMPLoader
             }
         }
 
-        public void SkipToLineEnd ()
+        /// <summary>
+        /// Skip the current line
+        /// </summary>
+        public void SkipLine ()
         {
             while (Inbounds && CurrentChar != '\n')
             {
                 Skip();
             }
-        }
-
-
-        public void SkipLine ()
-        {
-            SkipToLineEnd();
             Skip();
         }
 
-        
-
+        /// <summary>
+        /// Skip the upcoming word and return it
+        /// </summary>
+        /// <returns></returns>
         public string SkipWordAhead ()
         {
             string word = "";
@@ -489,8 +535,16 @@ abstract class UMPLoader
             return word;
         }
 
+        /// <summary>
+        /// The output code from processing
+        /// </summary>
         public string ProcessedCode { get; set; }
 
+        /// <summary>
+        /// Go through a block of an "if" until its end
+        /// </summary>
+        /// <param name="condition"></param>
+        /// <exception cref="UMPException"></exception>
         public void TraverseIfBlock (bool condition)
         {
             while (Inbounds && CurrentChar != '#')
@@ -519,6 +573,10 @@ abstract class UMPLoader
             }
         }
 
+        /// <summary>
+        /// Process the start of an #if block
+        /// </summary>
+        /// <exception cref="UMPException"></exception>
         public void ProcessIfBlock ()
         {
             SkipWhitespace();
@@ -533,6 +591,10 @@ abstract class UMPLoader
             TraverseIfBlock(condition);
         }
 
+        /// <summary>
+        /// Skip the upcoming word while adding it to the processed code and return it
+        /// </summary>
+        /// <returns></returns>
         public string ReadWordAhead ()
         {
             int i = Index;
@@ -546,6 +608,11 @@ abstract class UMPLoader
             return word;
         }
 
+        /// <summary>
+        /// Process code for a UMP enum
+        /// </summary>
+        /// <param name="enumName"></param>
+        /// <exception cref="UMPException"></exception>
         public void ProcessEnum (string enumName)
         {
             if (!Enums.ContainsKey(enumName))
@@ -582,6 +649,11 @@ abstract class UMPLoader
             Skip(word.Length);
         }
 
+        /// <summary>
+        /// Process code for a UMP method
+        /// </summary>
+        /// <param name="method"></param>
+        /// <exception cref="UMPException"></exception>
         public void ProcessMethod (string method)
         {
             List<object> methodArgs = new();
@@ -628,6 +700,10 @@ abstract class UMPLoader
             }
         }
 
+        /// <summary>
+        /// Process the code
+        /// </summary>
+        /// <returns></returns>
         public string Preprocess ()
         {
             ProcessedCode = "";
@@ -690,6 +766,11 @@ abstract class UMPLoader
             return ProcessedCode;
         }
 
+        /// <summary>
+        /// Create processor for a code string with given options
+        /// </summary>
+        /// <param name="code"></param>
+        /// <param name="loader"></param>
         public CodeProcessor (string code, UMPLoader loader)
         {
             Code = code;
@@ -699,20 +780,49 @@ abstract class UMPLoader
         }
     }
 
+    /// <summary>
+    /// Parses the code for the /// FUNCTIONS files
+    /// </summary>
     public class FunctionsFileParser
     {
+        /// <summary>
+        /// Index in the code
+        /// </summary>
         public int Index { get; set; }
 
+        /// <summary>
+        /// Code of the file
+        /// </summary>
         public string Code { get; set; }
 
+        /// <summary>
+        /// File path, for debugging only
+        /// </summary>
         public string File { get; set; }
 
+        /// <summary>
+        /// List of all the functions that will be added
+        /// </summary>
         public List<UMPFunctionEntry> Functions { get; set; }
 
+        /// <summary>
+        /// Should be UMP_WRAPPER
+        /// </summary>
         public UMPWrapper Wrapper { get; set; }
 
+        /// <summary>
+        /// Whether the functions should be imported as global scripts (for GMS 2.3 and higher) or not (lower than GMS 2.3)
+        /// </summary>
         public bool UseGlobalScripts { get; set; }
 
+        /// <summary>
+        /// Create parser for given code and options
+        /// </summary>
+        /// <param name="code"></param>
+        /// <param name="file"></param>
+        /// <param name="functions"></param>
+        /// <param name="useGlobalScripts"></param>
+        /// <param name="wrapper"></param>
         public FunctionsFileParser (string code, string file, List<UMPFunctionEntry> functions, bool 
         useGlobalScripts, UMPWrapper wrapper)
         {
@@ -724,15 +834,29 @@ abstract class UMPLoader
             Wrapper = wrapper;
         }
 
+        /// <summary>
+        /// Current character in the code
+        /// </summary>
         public char CurrentChar => Code[Index];
 
+        /// <summary>
+        /// Skip an amount of characters
+        /// </summary>
+        /// <param name="amount"></param>
         public void Advance (int amount = 1)
         {
             Index += amount;
         }
 
+        /// <summary>
+        /// Whether the index is inbounds or not
+        /// </summary>
         public bool Inbounds => Index < Code.Length;
 
+        /// <summary>
+        /// Parse the code and add all the functions to the list
+        /// </summary>
+        /// <exception cref="UMPException"></exception>
         public void Parse ()
         {
             while (Index < Code.Length)
@@ -769,6 +893,11 @@ abstract class UMPLoader
             }
         }
     
+        /// <summary>
+        /// Extract the arguments of the current function
+        /// </summary>
+        /// <returns></returns>
+        /// <exception cref="UMPException"></exception>
         public List<string> ExtractArguments ()
         {
             List<string> args = new();
@@ -799,6 +928,11 @@ abstract class UMPLoader
             return args;
         }
 
+        /// <summary>
+        /// Extract the body of the current function
+        /// </summary>
+        /// <returns></returns>
+        /// <exception cref="UMPException"></exception>
         public string ExtractFunctionBody ()
         {
             while (Inbounds && CurrentChar != '{')
@@ -833,6 +967,13 @@ abstract class UMPLoader
             return Code.Substring(codeStart, Index - codeStart - 1);
         }
 
+        /// <summary>
+        /// Create the code for a function's script
+        /// </summary>
+        /// <param name="functionName"></param>
+        /// <param name="args"></param>
+        /// <param name="functionBody"></param>
+        /// <returns></returns>
         public static string CreateFunctionCode (string functionName, List<string> args, string functionBody)
         {
             List<string> gmlArgs = new();
@@ -854,11 +995,21 @@ abstract class UMPLoader
         }
     }
     
+    /// <summary>
+    /// Get the name of the object from its entry name
+    /// </summary>
+    /// <param name="entryName"></param>
+    /// <returns></returns>
     public string GetObjectName (string entryName)
     {
         return Regex.Match(entryName, @"(?<=gml_Object_).*?((?=(_[a-zA-Z]+_\d+))|(?=_Collision))").Value;
     }
 
+    /// <summary>
+    /// Create a new game object with the given name
+    /// </summary>
+    /// <param name="objectName"></param>
+    /// <returns></returns>
     public UndertaleGameObject CreateGameObject (string objectName)
     {
         var obj = new UndertaleGameObject();
@@ -868,6 +1019,11 @@ abstract class UMPLoader
         return obj;
     }
 
+    /// <summary>
+    /// Add GML code to the end of a code entry
+    /// </summary>
+    /// <param name="codeName"></param>
+    /// <param name="code"></param>
     public void AppendGML (string codeName, string code)
     {
         Wrapper.Data.Code.ByName(codeName).AppendGML(code, Wrapper.Data);
@@ -987,8 +1143,14 @@ class UMPPatchFile
     /// </summary>
     public string Code { get; set ; }
 
+    /// <summary>
+    /// Whether the patch is for a disassembly text file or not
+    /// </summary>
     public bool IsASM { get; set; }
 
+    /// <summary>
+    /// Should be UMP_WRAPPER
+    /// </summary>
     public UMPWrapper Wrapper { get; set; }
 
     public UMPPatchFile (string gmlCode, string entryName, bool isASM, UMPWrapper wrapper)
@@ -1092,7 +1254,7 @@ class UMPPatchFile
         }
     }
 
-    public void UMPAddCodeToPatch (string codeName)
+    public void AddCode (string codeName)
     {
         try
         {
@@ -1112,20 +1274,6 @@ class UMPPatchFile
         }
     }
 }
-
-/// <summary>
-/// Append GML to the end of a code entry
-/// </summary>
-/// <param name="codeName"></param>
-/// <param name="code"></param>
-
-
-/// <summary>
-/// Create a game object with the given name
-/// </summary>
-/// <param name="objectName"></param>
-/// <returns></returns>
-
 
 /// <summary>
 /// Represents a code entry that will be added
@@ -1158,7 +1306,6 @@ public class UMPCodeEntry
         return Name == other.Name && Code == other.Code;
     }
     
-    // override object.GetHashCode
     public override int GetHashCode()
     {
         // TODO: write your implementation of GetHashCode() here
@@ -1192,135 +1339,6 @@ class UMPFunctionEntry : UMPCodeEntry
     }
 }
 
-
-/// <summary>
-/// Handles converting from PASCAL CASE to other cases
-/// </summary>
-static class UMPCaseConverter
-{
-    /// <summary>
-    /// Convert into a generic case
-    /// </summary>
-    /// <param name="nameCase">Case to convert to</param>
-    /// <param name="name">Name to change the case</param>
-    /// <returns>Converted name</returns>
-    /// <exception cref="Exception">If giving an unsupported case</exception>
-    public static string Convert (NameCase nameCase, string name)
-    {
-        if (!IsPascalCase(name))
-        {
-            throw new UMPException($"Original case must be pascal case for name \"{name}\"");
-        }
-        switch (nameCase)
-        {
-            case NameCase.CamelCase:
-                return ToCamel(name);
-            case NameCase.SnakeCase:
-                return ToSnake(name);
-            case NameCase.ScreamingSnakeCase:
-                return ToScreamingSnake(name);
-            default:
-                throw new Exception($"Unsupported case: {nameCase}");
-        }
-    }
-
-    public static bool IsPascalCase(string str)
-    {
-        return Regex.IsMatch(str, @"^[A-Z][a-zA-Z0-9]*$");
-    }
-
-    /// <summary>
-    /// Convert from pascal case to camel case
-    /// </summary>
-    /// <param name="pascalCase">String in pascal case</param>
-    /// <returns>String in camel case</returns>
-    public static string ToCamel (string pascalCase)
-    {
-        return pascalCase.Substring(0, 1).ToLower() + pascalCase.Substring(1);
-    }
-
-    /// <summary>
-    /// Convert from pascal case to snake case
-    /// </summary>
-    /// <param name="pascalCase">String in pascal case</param>
-    /// <returns>String in snake case</returns>
-    public static string ToSnake (string pascalCase)
-    {
-        string snakeCase = "";
-        for (int i = 0; i < pascalCase.Length; i++)
-        {
-            char c = pascalCase[i];
-            if (char.IsUpper(c))
-            {
-                snakeCase += "_" + char.ToLower(c);
-            }
-            else
-            {
-                snakeCase += c;
-            }
-        }
-        if (snakeCase.StartsWith("_"))
-        {
-            snakeCase = snakeCase.Substring(1);
-        }
-        return snakeCase;
-    }
-
-    /// <summary>
-    /// Convert from pascal case to screaming snake case
-    /// </summary>
-    /// <param name="pascalCase">String in pascal case</param>
-    /// <returns>String in screaming snake case</returns>
-    public static string ToScreamingSnake (string pascalCase)
-    {
-        return UMPCaseConverter.ToSnake(pascalCase).ToUpper();
-    }
-
-    /// <summary>
-    /// Get the name case from the name of the case as supported in the UMP config file
-    /// </summary>
-    /// <param name="caseName">Name of the case</param>
-    /// <returns>Case type</returns>
-    /// <exception cref="Exception">If an unknown case name is given</exception>
-    public static NameCase CaseFromString (string caseName)
-    {
-        switch (caseName)
-        {
-            case "camel-case":
-                return NameCase.CamelCase;
-            case "snake-case":
-                return NameCase.SnakeCase;
-            case "screaming-snake-case":
-                return NameCase.ScreamingSnakeCase;
-            default:
-                throw new Exception("Unknown case name: " + caseName);
-        }
-    }
-
-    /// <summary>
-    /// Represents a case for a name
-    /// </summary>
-    public enum NameCase
-    {
-        /// <summary>
-        /// Case "LikeThis"
-        /// </summary>
-        PascalCase,
-        /// <summary>
-        /// Case "likeThis"
-        /// </summary>
-        CamelCase,
-        /// <summary>
-        /// Case "like_this"
-        /// </summary>
-        SnakeCase,
-        /// <summary>
-        /// Case "LIKE_THIS"
-        /// </summary>
-        ScreamingSnakeCase
-    }
-}
-
 public class UMPException : Exception
 {
     public UMPException(string message) : base(message)
@@ -1335,7 +1353,6 @@ public class UMPWrapper
     public string ScriptPath;
 
     public Func<string, string, string> ImportGMLString;
-
 
     public Func<string, string, string> ImportASMString;
 
