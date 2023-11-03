@@ -772,18 +772,18 @@ abstract class UMPLoader
         public List<string> ExtractArguments ()
         {
             List<string> args = new();
-            int nameStart = Index + 1;
+            int argStart = Index + 1;
             while (Inbounds)
             {
                 bool endLoop = CurrentChar == ')';
                 if (CurrentChar == ',' || endLoop)
                 {
-                    string argName = Code.Substring(nameStart, Index - nameStart).Trim();
+                    string argName = Code.Substring(argStart, Index - argStart).Trim();
                     if (argName != "")
                     {
                         args.Add(argName);
                     }
-                    nameStart = Index + 1;
+                    argStart = Index + 1;
                     if (endLoop)
                     {
                         break;
