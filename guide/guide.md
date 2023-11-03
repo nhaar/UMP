@@ -1,37 +1,135 @@
 Here you will see everything you need to know to use this framework!
 
-# Setting up the mod folder
+# The LOADER
 
-The mod works by linking a folder where all `.gml` code is kept. In the `ump-config.json` file that you set up during
-installation, you can set up the path to the mod folder, **relative to the main `.csx` script** of your project. For example, a folder named `mod` in the same directory as the script:
+Everything revolves around creating your own loader with the options, enums and methods you wish to use.
 
-```json
+Once you have loaded the ump file, you will have access to the abstract class `UMPLoader`. To create your own loader, you will need to create a new class inheriting it, and overriding all the properties and methods as you wish, which will be shown below.
+
+## Loader properties and methods to override
+
+This is a list of every property and method and what they do. Abstract ones are mandatory, while virtual ones aren't and have a default value. Examples will be listed below!
+
+* `abstract string CodePath`: The path to your folder containing all your files, relative to your MAIN `.csx` script, which is the one that you tell UTMT to run,
+
+* `abstract bool UseGlobalScripts`: A boolean that depends on the GameMaker Studio version for your game. For versions smaller than 2.3, you will set this to `false`, and for versions greater than that, you will set this to `true`
+
+* `virtual string[] Symbols`: (optional) An array containing all symbols you want to define for preprocessing.
+
+* `abstract string[] GetCodeNames (string filePath)`: This is a method you must override. This function will be used to tell the loader what code entries you will replace with each file. The argument is the (relative) path of the file, and it should return an array containing all code entries it will replace
+
+## Constructor
+
+You will need to give a constructor for your class. Because of how the scripting environment works, you will need to
+have it contain a `UMPWrapper` argument, and pass it to the base constructor. When you instantiate the class, you need to pass the global variable UMP_WRAPPER. Look at the example below for more information
+
+## Loading
+
+Once you have created and instantiated your derived class, you can load all the code files using the `.Load` method, which takes no arguments.
+
+## Basic example
+
+Here's a very simple loader example you can copy if you aren't sure of how to start
+
+```cs
+class ExampleLoader : UMPLoader
 {
-    "mod-path": "mod/"
+    public override string CodePath => "mod/"; // loading all files inside a folder "mod"
+
+    public override bool UseGlobalScripts => true; // For GameMaker Studio > 2.3
+
+    public bool IsDebug { get; set; } // THIS IS NOT NCESSARY! It's just an example of how you can use the symbols
+
+    // Here's an example of how you can set up your symbols. Symbols are optional, so it will depend on if you want to use them
+    // If you don't want to use them, you can skip overriding it
+    public override string[] Symbols => IsDebug ? new string[] { "DEBUG" } : new string[] { "PRODUCTION" };
+
+    // A very simple implementation of the names method which returns a single code entry which should be
+    // equal to the file name you gave
+    public override string[] GetCodeNames (string filePath)
+    {
+        return new string[] { Path.GetFileNameWithoutExtension(filePath) };
+    }
+
+    // You must give a constructor and pass a UMPWrapper to the base constructor
+    public ExampleLoader (UMPWrapper wrapper, bool isDebug) : base(wrapper)
+    {
+        IsDebug = isDebug;
+    }
+}
+
+// When you instantiate, you must pass the global variable UMP_WRAPPER
+ExampleLoader loader = new ExampleLoader(UMP_WRAPPER, true);
+
+// Loading all the files
+loader.Load();
+```
+
+# How to import code with UMP
+
+If you just drop normal GML files in your mod folder, you will notice you will get an error. This is because you need to specify in the first line of your code what the UMP type is. There are three UMP types:
+
+1. IMPORT -> This represents that you want the entire code inside your file to replace a code entry (or create a new one)
+2. PATCH -> This represents a patch file, the syntax will be given below
+3. FUNCTIONS -> This represents a file where you can define new functions, and they will be added to your project
+
+To specify the type, you must use three slashes:
+
+```/// IMPORT```
+
+# How to use GetCodeNames: Automatic object creation
+
+To make use of the automatic code creation for objects, you will need to make sure you are giving proper object names. In Undertale Mod Tool, you can linke code to objects if the code name has the following format:
+
+* Prefixed with `gml_Object_`
+* Followed by the object name
+* An underscore followed by the event name
+* An underscore followed by the event type
+
+For example: 
+
+`gml_Object_obj_time_Create_0`
+
+`obj_time` is the name, `Create` is the event. `0` is the subtype ID. Create events have no subtypes, but for example for "Draw" events, subtype ID 64 equates to DrawGUI. You can look up the events and subtypes inside Undertale Mod Tool itself.
+
+With this information, you can setup your own `GetCodeNames` function how you wish to. An example implementation:
+
+```cs
+public override string[] GetCodeNames (string filePath)
+{
+    string fileName = Path.GetFileNameWithoutExtension(filePath);
+
+    // assume all code files starting with obj_ are for objects
+    if (fileName.StartsWith("obj_"))
+    {
+        fileName = "gml_Object_" + fileName;
+    }
+
+    return new string[] { fileName };
 }
 ```
 
-The files inside the folder can be in any subdirectory, as long as they end in `.gml`.
+An example file for this implementation: `obj_time_Create_0` will create the code entry `gml_Object_obj_time_Create_0`
 
-# Properly naming the files
+# Creating functions with UMP: Function files
 
-In vanilla Undertale Mod Tool, you can create new object code directly by just using proper name for the files. For example, if you have an object called `obj_object`, and you want to add a create event listener, you can simply leave a file named `gml_Object_obj_object_Create_0.gml` inside the mod folder. The number at the end is required and can be used to have different events. So, for objects, you just need to name the file in the format `gml_Object_OBJECT_NAME_EVENT_NAME_EVENTNUMBER`.
+Function files are the ones that start with `/// FUNCTIONS`. In a function file, the following is valid:
 
-In the framework, if you use an object that doesn't exist, the object will be automatically created.
+1. You can define new functions using the `function` keyword. This is valid even for older GameMaker Studio versions.
+2. The arguments of the functions need not be `argument0`, `argument1`...
 
-For functions, you can name the file in the pattern `gml_GlobalScript_FUNCTION_NAME`, and for GMS 2.3 and above, you may use the `function ()` syntax to define them.
+**WARNING**: `GetCodeNames` does NOT get used in function files. It only applies to IMPORT and PATCHES files.
 
-## Shorthand for object prefixes
+Here is an example of a "functions" file:
 
-If you're not very happy with having to write `gml_Object` in every file name, then you can define object prefixes in your configuration file. Inside `ump-config`, you can add the key `object-prefixes`, which should have as the value a JSON array containing all the allowed prefixes for an object. If a file begins with any of the given prefixes, it will be considered an object file. Here's how it should look like:
+```gml
+/// FUNCTIONS
 
-```json
+function hello_world(message)
 {
-    "object-prefixes": ["obj_", "o_"]
+    return "Hello, World! " + message
 }
 ```
-
-Now, all files inside the mods directory beginning with either `obj_` or `o_` will automatically be treated as objects.
 
 # Patch files
 
@@ -190,271 +288,132 @@ middle_line = "this is changed now"
 line3 = 3
 ```
 
-# Ignoring Files
+# Preprocessing
 
-If you want to include `.gml` files in the mod folder and not manually add them, you can add `/// IGNORE` to their first line.
+In preprocessing, you can choose what part of your code will get used or not depending on your symbols. A symbol is just a word that can be defined or not. You can define them in your symbols array in `UMPLoader`.
 
-# Function files
+## Ignoring Files
 
-UMP supports a custom syntax to define multiple functions in one file. First, write the first line of the file as being `/// FUNCTIONS`.
+You can ignore files with your symbols. In the first line, after the file type, you can include `.ignore if SYMBOL` to ignore the file if the symbol is defined, or `.ignore ifndef SYMBOL` ot ignore the file if the symbol is not defined. For example
+
+```gml
+/// FUNCTIONS .ignore ifndef DEBUG
+
+function some_debug_function()
+{
+    return "Debug"
+}
+```
+
+## Selectively including code
+
+You can remove or include parts of code depending on your symbols using if-else statements with the symbols. You can do so by using "#" followed by the keywords "if", "ifndef", "elsif", "elsifndef", "else" and "endif". To start such block, you begin by writing either "#if" or "#ifndef", followed by a symbol. Then, everything after that (including everything in the same line) will be ERASED if the condition is not met, up until the "#endif" statement. Likewise, you can chain it using else statements, with other symbols with "#elsif" and "#elseifndef" or with no symbol using "#else". Here's an example
 
 ```gml
 /// FUNCTIONS
-```
 
-Then, the functions can be defined as normally
-
-```gml
-/// FUNCTIONS
-
-function hello()
+function is_debug()
 {
-    return "Hello";
-}
-
-function world(argument0)
-{
-    return is_undefined(argument0) ? "World!" : argument0;
+#if DEBUG
+    return true
+#elsif PRODUCTION
+    return false
+#else
+    return "something else..."
+#endif
 }
 ```
 
-Normally, UTMT only accepts arguments named like `argument0, ... argumentN`. This is not the case with functions defined in a UMP function file
-
-```gml
-function named_arg(i_have_name)
-{
-    return i_have_name;
-}
-```
-
-Naturally, `argumentN` still works as normal.
-
-Note that hoisting is done as it normally is with other functions: You can use functions before defining them in the file, you just can't have circular dependence.
+If the DEBUG symbol is defined, it will return true, else if the PRODUCTION symbol is defined, it will return false. If neither are defined, it will return something else. Using "ifndef" would equate eto the symbol not being defined.
 
 # Enums
 
-Enums are part of the current verison of GML, but not supported in UTMT. An implementation of enums can be used with UMP files, but not using the same syntax of enums as in standard GML, but instead, a mix of CSX files and UMP commands.
-
-## Setup
-
-1. First, you must create your enums. Create a C# code file including ONLY ENUMS, and no comments or any other code, such as
+Enums are part of the current verison of GML, but not supported in UTMT. An implementation of enums can be used with UMP files, but not using the same syntax of enums as in standard GML. To create custom enums, you will want to include inside your `UMPLoader` implementation declarations of enums. For example
 
 ```cs
-enum TestEnum
+public class ExampleLoader : UMPLoader
 {
-    A,
-    B,
-    C = 4,
-}
+    /// ... rest of the code
 
-enum OtherEnum
-{
-    A = 5
-}
-```
-
-2. Then, in your `ump-config` file, add the path to the enum file using `enum-file`:
-
-```json
-{
-    "enum-file": "enum.csx" // relative to the main script
+    public enum ExampleEnum
+    {
+        Value,
+        AnotherValue = 10
+    }
 }
 ```
 
-3. Finally, you can use the enums inside your GML code by using the command `/// USE ENUM` anywhere in your file, and add the names of the enums. An example of a `.gml` file using the enums from UMP:
+After defining this, you can then call the enum inside GML using "#":
 
 ```gml
-/// USE ENUM Test, OtherEnum
-show_debug_message(Test.A)
-show_debug_message(Test.B)
-show_debug_message(Test.C)
-show_debug_message(OtherEnum.A)
+show_debug_message(#ExampleEnum.Value) // will be compiled as show_debug_message(0)
 ```
 
-This will be compiled as:
+You can also access specific enum properties, using ".#" and the name, for example:
+
 ```gml
-show_debug_message(0)
-show_debug_message(1)
-show_debug_message(4)
-show_debug_message(5)
+#ExampleEnum.#length
 ```
 
-**WARNING**: If using the case converter, the enum name should be used AFTER the conversion (see below for details)
+Supported properties include:
 
-## Converting Case
+* "length": The total number of values in the enum
 
-If you bother to keep a consistent and different case between your `.csx` files and `.gml` files, you can use the case converting option. The cases for the enum name and members are assumed to be pascal case (PascalCase). You can convert it to either camel case (camelCase), snake case (snake_case) or screaming snake case (SCREAMING_SNAKE_CASE). To do this, include in your `ump-config` file first the key `case-converter` set to `true`, and then the keys `enum-name-case` and `enum-member-case` can be added if you want to change their case. The values of the cases must be one of these:
-* `snake-case`
-* `screaming-snake-case`
-* `camel-case`
+# Methods
 
-Example"
+You can create custom methods that return strings in C# and access them inside GML. To do this, you must add new methods
+to your `UMPLoader` derived class. For example:
 
-```json
+```cs
+public class ExampleLoader : UMPLoader
 {
-    "case-converter": true,
-    "enum-name-case": "screaming-snake-case",
-    "enum-member-case": "snake-case"
+    /// ... rest of the code
+
+    public string ExampleMethod()
+    {
+        return "Hello, World!";
+    }
 }
 ```
 
-# Mod API
-
-Aditionally, if you are loading the mod inside another `.csx` script, you can use the API given by the mod, which consists of some functions and variables, some more useful than others, listed below
-
-## UMPAppendGML Method
-
-### Definition
-
-Append GML code to the end of a code entry
-
-### Parameters
-
-`codeName` String
-
-Name of the code entry
-
-`code` String
-
-Code to append
-
-### Returns
-
-`void`
-
-## UMPCreateGMSObject Method
-
-### Definition
-
-Create a new game object and add it to the game data
-
-### Parameters
-
-`objectName` String
-
-Name of the object
-
-### Returns
-
-`UndertaleModLib.Models.UndertaleGameObject`
-
-The object created
-
-## UMPImportFile Method
-
-### Definition
-
-The same as `ImportGMLFile`, but it also accepts the UMP patch files.
-
-If anything wrong happens with the process, the mod will log the error to the console.
-
-### Parameters
-
-`path` String
-
-The path to the file to be imported
-
-### Returns
-
-`void`
-
-## UMPImportGML Method
-
-### Definition
-
-The same as `ImportGMLString`, but it also accepts the UMP patch files.
-
-### Parameters
-
-`codeName` String
-
-The name of the code entry to import the string to
-
-`code` String
-
-The GML code to add to the code entry
-
-### Returns
-
-`void`
-
-## UMPCheckIfCodeExists Method
-
-### Definition
-
-Checks if a code entry exists in the game data.
-
-### Parameters
-
-`codeName` String
-
-The name of the code entry
-
-### Returns
-
-`bool`
-
-`true` if the code entry exists, `false` if it doesn't
-
-## UMPGetObjectName Method
-
-### Definition
-
-Get the name of the game object from a code entry that belongs to the object (in the UTMT code entry name format). For example, the name of the game object from the code entry `gml_Object_obj_time_Create_0` is `obj_time`.
-
-### Parameters
-
-`entryName` String
-
-The name of the code entry
-
-### Returns
-`string`
-
-The name of the game object
-
-## UMPPrefixEntryName Method
-
-### Definition
-
-Takes a name, and if necessary adds the UTMT object prefix to it, if the name given starts with any of the object prefixes defined in the config file. If not, it returns the inputted string. For example, it can transform `obj_time` -> `gml_Object_obj_time`, of `obj_` is in the object prefixes in the config file.
-
-### Returns
-`string`
-
-The entry name, prefixed if needed.
-
-## UMP_DECOMPILE_CONTEXT Variable
-
-### Type
-`ThreadLocal<GlobalDecompileContext>`
-
-### Definition
-
-An instance of a `ThreadLocal<GlobalDecompileContext>` that you can use to decompile code.
-
-## UMP_SCRIPT_DIR Variable
-
-### Type
-`string`
-
-### Definition
-
-The path to the directory that contains the main script that is being ran by UndertaleModTool.
-
-## UMP_MOD_PATH Variable
-
-### Type
-`string`
-
-### Definition
-
-The path to the mod folder.
-
-## UMP_MOD_FILES Variable
-
-### Type
-`string[]`
-
-### Definition
-An array with all the `gml` files inside the mod folder.
+Now, if you call the method inside the files:
+
+```gml
+show_debug_message(#ExampleMethod()) // this will get compiled as show_debug_message("Hello, World!")
+```
+
+Remember that the methods are executed at compile time only, and they must return strings, because the methods are used to generate GML.
+
+Arguments are supported, and they can be of the following type:
+
+* Strings, which is anything enclosed by double quotes.
+* Integers and doubles
+* UMP Literals: Arbitrary text that starts with @@ and ends with $$. Anything between them will be added as is, and this will be passed as a string.
+
+Here's an example of all arguments
+```cs
+public class ExampleLoader : UMPLoader
+{
+    /// ... rest of the code
+
+    public string ExampleMethod(string exampleString, int exampleInt, double exampleDouble, string exampleUMPLiteral)
+    {
+        return $"{exampleString} ({exampleInt + exampleDouble}): {exampleUMPLiteral}";
+    }
+}
+```
+
+In GML:
+
+```gml
+#ExampleMethod("case", 1, 2.3, @@
+    show_debug_message("hello world!")
+$$)
+```
+
+will be compiled as
+
+```gml
+case (2.4):
+    show_debug_message("hello world!")
+```

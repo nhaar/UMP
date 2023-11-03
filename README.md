@@ -1,27 +1,28 @@
 # Warning!
 
-This framework only partly works in [this build of of UTMT](https://github.com/krzys-h/UndertaleModTool/pull/1504). If you are using a base `.csx` script (details below), until the pull request is approved, you will need to build the code for that if you want to use this.
+This framework doesn't work in the main verison of Undertale Mod Tool yet. If you will need to use [this build of of UTMT](https://github.com/krzys-h/UndertaleModTool/pull/1504) until the pull request is approved.
 
 # Welcome to UMP - A mini framework for modding with Undertale Mod Tool
 
-UMP (pronounce it by letters or phonetically, both is fine) is a (mini) framework for modding using Undertale Mod Tool. It includes:
+UMP (pronounce it by letters or phonetically, both is fine) is a (mini) framework for modding using Undertale Mod Tool.
+It focuses around being able to better organize your gamemaker (and assembly) code for your mod. Its features include:
 
-* Support for having all the code for the mod as `.gml` files. You can link a folder with all the files, and name them such that they will be linked directly to
-existing objects and scripts, which is already an UTMT feature, but also:
+* You can organize all your code as external `.gml` files in a single folder, with any subdirectory organization, and it will link all subdirectories.
 
-1. Automatically create new objects if attempting to link to a non-existing object
+* You can configurate what code entries each file will affect depending on the file name. The standard use case for this is
+for example making a file named `obj_OBJECT_NAME_Step_0.gml` map to a code entry `gml_Object_OBJECT_NAME_Step_0.gml`; you are free to customize it to your project
 
-2. Scripts are compiled in the proper order as to not cause problems
+* Automatically create new objects, if code for such an object is detected, and organizes new functions so that they are always defined in a proper order
 
-* Add simple and short syntax for using patch files, as to have files that only change parts of the code, making them clean and more resistant to version changes
+* Allow more easily creating custom functions, allowing you to define multiple functions in one file
 
-* Allow defining multiple functions in one file
+* Allows for using PATCH files which will only change parts of a code entry, reducing unused code and making the patches more version resistent
 
-* Allow using enums (check guide for syntax) in the GML files (enums exist in normal GML, but not supported in UTMT)
+* Allows using enums in UTMT (syntax isn't the same as in normal GML, check guide)
 
-* Extra useful API that can be used inside the `.csx` scripts
+* Allows using inline C# methods to generate GML, which work by defining them in the C# part of the script and calling them in GML
 
-The framework is meant to be used alongside a base `.csx` script, or if you do not wish to use any custom scripting code, you can use it directly.
+* Allows for code preprocessing using SYMBOLS
 
 # Installation tutorial
 
@@ -30,12 +31,7 @@ If your project already contains a base `.csx` script, then:
 1. Download the `ump.csx` file from the releases
 2. Drop it anywhere you want inside your project
 3. Inside your main `.csx` script, add `#load "RELATIVE PATH TO ump.csx"` at the top
-4. In the same folder as your main `.csx` script, add a `ump-config.json` file, and set it to your desired options (check tutorial below)
-
-If your project contains no `.csx` script, then:
-1. Put the `ump.csx` file wherever you keep your `gml` code, and in the same folder add a `ump-config.json`.
-2. Configurate the `ump-config` to link to the folder (check tutorial for how to)
-3. Whenever you wish to run the mod, run the `ump.csx` file
+4. The mod is installed! Check the guide to learn how to use it
 
 # Guide/Tutorial
 
