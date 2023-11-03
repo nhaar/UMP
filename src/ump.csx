@@ -86,15 +86,17 @@ abstract class UMPLoader
         return enumValues;
     }
 
+    /// <summary>
+    /// Loads all the code files with all the defined settings for the class
+    /// </summary>
+    /// <exception cref="UMPException">If an error using the UMP features occurs</exception>
+    /// <exception cref="Exception"></exception>
     public void Load ()
     {
-        string[] searchPatterns = new[] { "*.gml", "*.asm" };
-        string scriptDir = Path.GetDirectoryName(Wrapper.ScriptPath);
-
         string absoluteCodePath = "";
         try
         {
-            absoluteCodePath = Path.Combine(scriptDir, CodePath);
+            absoluteCodePath = Path.Combine(Path.GetDirectoryName(Wrapper.ScriptPath), CodePath);
         }
         catch
         {
