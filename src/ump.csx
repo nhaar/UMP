@@ -362,11 +362,8 @@ abstract class UMPLoader
         }
 
         // ignore if the condition is met (based on the symbol)
-        return 
-        (
-            (positiveCondition != "" && Symbols?.Contains(positiveCondition) == true) ||
-            (negativeCondition != "" && !Symbols?.Contains(negativeCondition) == true)
-        );
+        bool isPositiveCondition = positiveCondition != "";
+        return CodeProcessor.MetPreprocessingCondition(isPositiveCondition, isPositiveCondition ? positiveCondition : negativeCondition, Symbols);
     }
 
     /// <summary>
@@ -543,8 +540,9 @@ abstract class UMPLoader
         /// <summary>
         /// Process the start of an #if block
         /// </summary>
+        /// <param name="isPositiveCondition">Should be true if the condition in the #if statement being met should add the block and false if it should skip</param>
         /// <exception cref="UMPException"></exception>
-        public void ProcessIfBlock ()
+        public void ProcessIfBlock (bool isPositiveCondition)
         {
             SkipWhitespace();
             string symbol = SkipWordAhead();
@@ -553,7 +551,7 @@ abstract class UMPLoader
                 throw new UMPException("No symbol found after if keyword");
             }
             SkipLine();
-            bool condition = Symbols?.Contains(symbol) ?? false;
+            bool condition = MetPreprocessingCondition(isPositiveCondition, symbol);
             State = condition ? ParseState.AddBlock : ParseState.SkipBlock;
         }
 
@@ -691,6 +689,33 @@ abstract class UMPLoader
         }
 
         /// <summary>
+        /// Whether a preprocessing condition is met or not (it's based on a symbol)
+        /// </summary>
+        /// <param name="isPositiveCondition">If is positive, then the symbol needs to be defined, if not, then it needs to not be defined</param>
+        /// <param name="symbol">The symbol to test</param>
+        /// <param name="symbols">The defined symbols</param>
+        /// <returns></returns>
+        public static bool MetPreprocessingCondition (bool isPositiveCondition, string symbol, string[] symbols)
+        {
+            return
+            (
+                (isPositiveCondition && symbols?.Contains(symbol) == true) ||
+                (!isPositiveCondition && symbols?.Contains(symbol) != true)
+            );
+        }
+
+        /// <summary>
+        /// Whether a preprocessing condition is met or not (based on the instance's symbols)
+        /// </summary>
+        /// <param name="isPositiveCondition">If is positive, then the symbol needs to be defined, if not, then it needs to not be defined</param>
+        /// <param name="symbol">The symbol to test</param>
+        /// <returns></returns>
+        public bool MetPreprocessingCondition (bool isPositiveCondition, string symbol)
+        {
+            return MetPreprocessingCondition(isPositiveCondition, symbol, Symbols);
+        }
+
+        /// <summary>
         /// Process the code
         /// </summary>
         /// <returns></returns>
@@ -744,10 +769,10 @@ abstract class UMPLoader
                         Skip(1);
                         string word = ReadWordAhead();
 
-                        if (State == ParseState.Normal && word == "if")
+                        if (State == ParseState.Normal && Regex.IsMatch(word, @"(if|ifndef)"))
                         {
-                            Skip(2);
-                            ProcessIfBlock();
+                            Skip(word.Length);
+                            ProcessIfBlock(word == "if");
                         }
                         else if (State != ParseState.Normal && word == "endif")
                         {
@@ -783,8 +808,8 @@ abstract class UMPLoader
                             Skip();
                         }
                         else
-                    {
-                        Advance();
+                        {
+                            Advance();
                         }
                         break;
                     }
