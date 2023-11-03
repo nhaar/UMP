@@ -809,6 +809,7 @@ abstract class UMPLoader
             {
                 throw new UMPException("Function body not found, in file: " + File);
             }
+            // we do want to skip the { (its added in something other function)
             int codeStart = Index + 1;
             int depth = 0;
             do
@@ -824,7 +825,7 @@ abstract class UMPLoader
                 Advance();
             }
             while (Inbounds && depth > 0);
-            if (!Inbounds)
+            if (depth > 0)
             {
                 throw new UMPException("Function body not closed, in file: " + File);
             }
