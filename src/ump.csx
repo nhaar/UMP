@@ -685,7 +685,11 @@ abstract class UMPLoader
             /// <summary>
             /// Inside a #if block that is being added (condition met)
             /// </summary>
-            AddBlock
+            AddBlock,
+            /// <summary>
+            /// If inside a #if-else block and one of the conditions have already been met, then all else will be skipped
+            /// </summary>
+            FinishedBlock
         }
 
         /// <summary>
@@ -716,6 +720,11 @@ abstract class UMPLoader
         }
 
         /// <summary>
+        /// If the parser is in a #if block that should be skipped
+        /// </summary>
+        public bool ShouldSkip => State == ParseState.SkipBlock || State == ParseState.FinishedBlock;
+
+        /// <summary>
         /// Process the code
         /// </summary>
         /// <returns></returns>
@@ -728,7 +737,7 @@ abstract class UMPLoader
                 {
                     case '"':
                     {
-                        if (State == ParseState.SkipBlock)
+                        if (ShouldSkip)
                         {
                             SkipString();
                         }
@@ -742,7 +751,7 @@ abstract class UMPLoader
                     {
                         if (Code[Index + 1] == '/')
                         {
-                            if (State == ParseState.SkipBlock)
+                            if (ShouldSkip)
                             {
                                 SkipLine();
                             }
@@ -753,7 +762,7 @@ abstract class UMPLoader
                         }
                         else
                         {
-                            if (State == ParseState.SkipBlock)
+                            if (ShouldSkip)
                             {
                                 Skip();
                             }
@@ -774,12 +783,44 @@ abstract class UMPLoader
                             Skip(word.Length);
                             ProcessIfBlock(word == "if");
                         }
-                        else if (State != ParseState.Normal && word == "endif")
+                        else if (State != ParseState.Normal && Regex.IsMatch(word, @"(endif|elsif|elsifndef|else)"))
                         {
-                            SkipLine();
-                            State = ParseState.Normal;
+                            Skip(word.Length);
+                            switch (word)
+                            {
+                                case "endif":
+                                {
+                                    SkipLine();
+                                    State = ParseState.Normal;
+                                    break;
+                                }
+                                case "elsif":
+                                case "elsifndef":
+                                {
+                                    if (State == ParseState.AddBlock)
+                                    {
+                                        State = ParseState.FinishedBlock;
+                                    }
+                                    else if (State == ParseState.SkipBlock)
+                                    {
+                                        ProcessIfBlock(word == "elsif");
+                                    }
+                                    else
+                                    {
+                                        // this should never happen
+                                        throw new UMPException("Invalid elsif in code");
+                                    }
+                                    break;
+                                }
+                                case "else":
+                                {
+
+                                    State = State == ParseState.SkipBlock ? ParseState.AddBlock : ParseState.FinishedBlock;
+                                    break;
+                                }
+                            }
                         }
-                        else
+                        else if (!ShouldSkip)
                         {
                             char afterWord = Code[Index + word.Length];
                             // enums
@@ -803,7 +844,7 @@ abstract class UMPLoader
                     }
                     default:
                     {
-                        if (State == ParseState.SkipBlock)
+                        if (ShouldSkip)
                         {
                             Skip();
                         }
