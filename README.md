@@ -1,6 +1,6 @@
 # Warning!
 
-This framework doesn't work in the main verison of Undertale Mod Tool yet. If you will need to use [this build of of UTMT](https://github.com/krzys-h/UndertaleModTool/pull/1504) until the pull request is approved.
+This framework doesn't work in the main verison of Undertale Mod Tool yet. If you will need to use [this build of UTMT](https://github.com/krzys-h/UndertaleModTool/pull/1504) until the pull request is approved.
 
 # Welcome to UMP - A mini framework for modding with Undertale Mod Tool
 
