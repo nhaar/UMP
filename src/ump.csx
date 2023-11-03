@@ -778,7 +778,14 @@ abstract class UMPLoader
                     }
                     default:
                     {
+                        if (State == ParseState.SkipBlock)
+                        {
+                            Skip();
+                        }
+                        else
+                    {
                         Advance();
+                        }
                         break;
                     }
                 }
