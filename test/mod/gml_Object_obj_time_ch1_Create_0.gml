@@ -1,11 +1,12 @@
 /// PATCH
 
-#if TEST
 /// PREPEND
+#if TEST2
 prepended = true
+#elsif TEST
 show_debug_message(#TestEnum.Test2)
-/// END
 #endif
+/// END
 
 /// REPLACE
 #if TEST
