@@ -8,9 +8,19 @@ show_debug_message(#TestEnum.Test2)
 #endif
 
 /// REPLACE
+#if TEST
 quit_timer = 0
+#endif
+#ifndef TEST
+axis_value = 0.4
+#endif
 /// CODE
+#if TEST
 quit_timer = 1
+#endif
+#ifndef TEST
+axis_value = 0.5
+#endif
 /// END
 
 /// AFTER
