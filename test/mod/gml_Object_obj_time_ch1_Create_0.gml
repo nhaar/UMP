@@ -50,3 +50,13 @@ enum_value3 = #TestEnum.#length
 /// APPEND
 method_result = #TestMethod("First", "Second")
 /// END
+
+/// APPEND
+#TestGMLMethod(@@
+show_debug_message(obj_mainchara)    
+$$)
+/// END
+
+/// APPEND
+show_debug_message(#TestNumberMethod(1, 2.3))
+/// END
