@@ -563,7 +563,7 @@ abstract class UMPLoader
         {
             int i = Index;
             string word = "";
-            while (Inbounds && char.IsLetterOrDigit(CurrentChar) || CurrentChar == '_')
+            while (Inbounds && (char.IsLetterOrDigit(CurrentChar) || CurrentChar == '_'))
             {
                 word += CurrentChar;
                 Skip();
