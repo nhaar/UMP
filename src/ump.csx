@@ -541,39 +541,6 @@ abstract class UMPLoader
         public string ProcessedCode { get; set; }
 
         /// <summary>
-        /// Go through a block of an "if" until its end
-        /// </summary>
-        /// <param name="condition"></param>
-        /// <exception cref="UMPException"></exception>
-        public void TraverseIfBlock (bool condition)
-        {
-            while (Inbounds && CurrentChar != '#')
-            {
-                if (condition)
-                {
-                    Advance();
-                }
-                else
-                {
-                    Skip();
-                }
-            }
-            if (!Inbounds)
-            {
-                throw new UMPException("Preprocessing if block not closed in code");
-            }
-            if (Code.Substring(Index + 1, 5) == "endif")
-            {
-                SkipLine();
-            }
-            // ADD MORE OPTIONS HERE LATER 
-            else
-            {
-                TraverseIfBlock(condition);
-            }
-        }
-
-        /// <summary>
         /// Process the start of an #if block
         /// </summary>
         /// <exception cref="UMPException"></exception>
@@ -587,8 +554,7 @@ abstract class UMPLoader
             }
             SkipLine();
             bool condition = Symbols?.Contains(symbol) ?? false;
-            SkipWhitespace();
-            TraverseIfBlock(condition);
+            State = condition ? ParseState.AddBlock : ParseState.SkipBlock;
         }
 
         /// <summary>
@@ -701,6 +667,30 @@ abstract class UMPLoader
         }
 
         /// <summary>
+        /// State of the parser relative to the #if blocks
+        /// </summary>
+        public ParseState State { get; set; } = ParseState.Normal;
+
+        /// <summary>
+        /// Possible states of the parser
+        /// </summary>
+        public enum ParseState
+        {
+            /// <summary>
+            /// Outside any #if block
+            /// </summary>
+            Normal,
+            /// <summary>
+            /// Inside a #if block that is being skipped (condition not met)
+            /// </summary>
+            SkipBlock,
+            /// <summary>
+            /// Inside a #if block that is being added (condition met)
+            /// </summary>
+            AddBlock
+        }
+
+        /// <summary>
         /// Process the code
         /// </summary>
         /// <returns></returns>
@@ -713,18 +703,39 @@ abstract class UMPLoader
                 {
                     case '"':
                     {
-                        AddString();
+                        if (State == ParseState.SkipBlock)
+                        {
+                            SkipString();
+                        }
+                        else
+                        {
+                            AddString();
+                        }
                         break;
                     }
                     case '/':
                     {
                         if (Code[Index + 1] == '/')
                         {
-                            AddComment();
+                            if (State == ParseState.SkipBlock)
+                            {
+                                SkipLine();
+                            }
+                            else
+                            {
+                                AddComment();
+                            }
                         }
                         else
                         {
-                            Advance();
+                            if (State == ParseState.SkipBlock)
+                            {
+                                Skip();
+                            }
+                            else
+                            {
+                                Advance();
+                            }
                         }
                         break;
                     }
@@ -732,10 +743,16 @@ abstract class UMPLoader
                     {
                         Skip(1);
                         string word = ReadWordAhead();
-                        if (word == "if")
+
+                        if (State == ParseState.Normal && word == "if")
                         {
                             Skip(2);
                             ProcessIfBlock();
+                        }
+                        else if (State != ParseState.Normal && word == "endif")
+                        {
+                            SkipLine();
+                            State = ParseState.Normal;
                         }
                         else
                         {
@@ -751,6 +768,10 @@ abstract class UMPLoader
                             {
                                 Skip(word.Length + 1);
                                 ProcessMethod(word);
+                            }
+                            else
+                            {
+                                throw new UMPException("Invalid '#' in code");
                             }
                         }
                         break;
