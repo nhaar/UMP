@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Reflection;
 using Newtonsoft.Json;
 using System.Linq;
+using System.Globalization;
 
 /// <summary>
 /// Wrapper for the IScriptInterface methods
@@ -660,11 +661,48 @@ abstract class UMPLoader
                     methodArgs.Add(SkipString());
                     addedArg = true;
                 }
-                // add support for more types: mainly INT and float
                 else if (Code.Substring(Index, 2) == "@@")
                 {
                     methodArgs.Add(GetGMLArgument());
                     addedArg = true;
+                }
+                else if (char.IsDigit(CurrentChar))
+                {
+                    string mainDigits = "";
+                    string decimalDigits = "";
+                    while (Inbounds && char.IsDigit(CurrentChar))
+                    {
+                        mainDigits += CurrentChar;
+                        Skip();
+                    }
+                    if (!Inbounds)
+                    {
+                        throw new UMPException("UMP Method not closed in code");
+                    }
+                    if (CurrentChar == '.')
+                    {
+                        Skip();
+                        decimalDigits = "";
+                        while (Inbounds && char.IsDigit(CurrentChar))
+                        {
+                            decimalDigits += CurrentChar;
+                            Skip();
+                        }
+                        if (!Inbounds)
+                        {
+                            throw new UMPException("UMP Method not closed in code");
+                        }
+                        Console.WriteLine("odd");
+                        Console.WriteLine(mainDigits + "." + decimalDigits);
+
+                        methodArgs.Add(double.Parse(mainDigits + "." + decimalDigits, CultureInfo.InvariantCulture));
+                        addedArg = true;
+                    }
+                    else
+                    {
+                        methodArgs.Add(int.Parse(mainDigits));
+                        addedArg = true;
+                    }
                 }
                 else
                 {
