@@ -1,6 +1,6 @@
 # Warning!
 
-This framework doesn't work in the main verison of Undertale Mod Tool yet. If you will need to use [this build of of UTMT](https://github.com/krzys-h/UndertaleModTool/pull/1504) until the pull request is approved.
+This framework doesn't work in the main verison of Undertale Mod Tool yet. If you will need to use [this build of UTMT](https://github.com/krzys-h/UndertaleModTool/pull/1504) until the pull request is approved.
 
 # Welcome to UMP - A mini framework for modding with Undertale Mod Tool
 
@@ -14,7 +14,7 @@ for example making a file named `obj_OBJECT_NAME_Step_0.gml` map to a code entry
 
 * Automatically create new objects, if code for such an object is detected, and organizes new functions so that they are always defined in a proper order
 
-* Allow more easily creating custom functions, allowing you to define multiple functions in one file
+* Allows to easily create custom functions, allowing you to define multiple functions in one file
 
 * Allows for using PATCH files which will only change parts of a code entry, reducing unused code and making the patches more version resistent
 
@@ -22,7 +22,7 @@ for example making a file named `obj_OBJECT_NAME_Step_0.gml` map to a code entry
 
 * Allows using inline C# methods to generate GML, which work by defining them in the C# part of the script and calling them in GML
 
-* Allows for code preprocessing using SYMBOLS
+* Allows for code preprocessing using symbols
 
 # Installation tutorial
 
