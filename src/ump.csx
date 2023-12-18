@@ -4,6 +4,9 @@ using System.Reflection;
 using Newtonsoft.Json;
 using System.Linq;
 using System.Globalization;
+using System.Security.Cryptography;
+
+ThreadLocal<GlobalDecompileContext> UMP_DECOMPILE_CONTEXT = new ThreadLocal<GlobalDecompileContext>(() => new GlobalDecompileContext(Data, false));
 
 /// <summary>
 /// Wrapper for the IScriptInterface methods
@@ -12,10 +15,11 @@ UMPWrapper UMP_WRAPPER = new UMPWrapper
 (
     Data,
     ScriptPath,
+    FilePath,
     (string name, string code) => { ImportGMLString(name, code); return ""; },
     (string name, string code) => { ImportASMString(name, code); return ""; },
     (string name) => GetDisassemblyText(name),
-    (string name) => GetDecompiledText(name)
+    UMP_DECOMPILE_CONTEXT
 );
 
 /// <summary>
@@ -37,6 +41,10 @@ abstract class UMPLoader
     /// A list of all the defined symbols, if any
     /// </summary>
     public virtual string[] Symbols { get; } = null;
+
+    public virtual bool UseDecompileCache { get; } = true;
+
+    public UMPDecompiler HelperDecompiler;
 
     /// <summary>
     /// A function that takes a path (relative to the main script folder) to a code file and returns the names of the code entries that should be imported from it as an array
@@ -60,6 +68,7 @@ abstract class UMPLoader
     public UMPLoader (UMPWrapper wrapper)
     {
         Wrapper = wrapper;
+        HelperDecompiler = new UMPDecompiler(Wrapper, UseDecompileCache);
     }
 
     /// <summary>
@@ -262,7 +271,7 @@ abstract class UMPLoader
 
         foreach (UMPCodeEntry entry in patches)
         {
-            UMPPatchFile patch = new UMPPatchFile(entry.Code, entry.Name, entry.IsASM, Wrapper);
+            UMPPatchFile patch = new UMPPatchFile(entry.Code, entry.Name, entry.IsASM, Wrapper, HelperDecompiler);
             if (patch.RequiresCompilation)
             {
                 patch.AddCode(entry.Name);
@@ -1333,10 +1342,13 @@ class UMPPatchFile
     /// </summary>
     public UMPWrapper Wrapper { get; set; }
 
-    public UMPPatchFile (string gmlCode, string entryName, bool isASM, UMPWrapper wrapper)
+    public UMPDecompiler HelperDecompiler { get; set; }
+
+    public UMPPatchFile (string gmlCode, string entryName, bool isASM, UMPWrapper wrapper, UMPDecompiler decompiler)
     {
         IsASM = isASM;
         Wrapper = wrapper;
+        HelperDecompiler = decompiler;
         gmlCode = gmlCode.Substring(gmlCode.IndexOf('\n') + 1);
         string[] patchLines = gmlCode.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None);
 
@@ -1445,7 +1457,7 @@ class UMPPatchFile
             }
             else
             {
-                Code = Wrapper.GetDecompiledText(codeName);
+                Code = HelperDecompiler.GetDecompiledText(codeName);
             }
         }
         catch
@@ -1532,6 +1544,8 @@ public class UMPWrapper
 
     public string ScriptPath;
 
+    public string DataPath;
+
     public Func<string, string, string> ImportGMLString;
 
     public Func<string, string, string> ImportASMString;
@@ -1540,21 +1554,91 @@ public class UMPWrapper
 
     public Func<string, string> GetDecompiledText;
 
+    public ThreadLocal<GlobalDecompileContext> DecompileContext;
+
     public UMPWrapper
     (
         UndertaleData data,
         string scriptPath,
+        string dataPath,
         Func<string, string, string> importGMLString,
         Func<string, string, string> importASMString,
         Func<string, string> getDisassemblyText,
-        Func<string, string> getDecompiledText
+        ThreadLocal<GlobalDecompileContext> decompileContext
     )
     {
         Data = data;
         ScriptPath = scriptPath;
+        DataPath = dataPath;
         ImportGMLString = importGMLString;
         ImportASMString = importASMString;
         GetDisassemblyText = getDisassemblyText;
-        GetDecompiledText = getDecompiledText;
+        DecompileContext = decompileContext;
+        if (Data.KnownSubFunctions is null)
+        {
+            Decompiler.BuildSubFunctionCache(Data);
+        }
+    }
+}
+
+/// <summary>
+/// Class that takes care of decompiling the code
+/// </summary>
+class UMPDecompiler
+{
+    /// <summary>
+    /// Path where the cache is stored for the current opened game
+    /// </summary>
+    public string DecompileCachePath;
+
+    /// <summary>
+    /// Should be UMP_WRAPPER
+    /// </summary>
+    public UMPWrapper Wrapper;
+
+    /// <summary>
+    /// Whether to use the decompile cache or not
+    /// </summary>
+    public bool UseDecompileCache;
+
+    public UMPDecompiler (UMPWrapper wrapper, bool useDecompileCache)
+    {
+        Wrapper = wrapper;
+        UseDecompileCache = useDecompileCache;
+
+        // use md5hash to separate the cached folders
+        string md5Hash;
+        using (var md5 = MD5.Create())
+        {
+            using (var stream = File.OpenRead(Wrapper.DataPath))
+            {
+                md5Hash = BitConverter.ToString(md5.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
+            }
+        }
+
+        DecompileCachePath = Path.Combine(Path.GetDirectoryName(Wrapper.ScriptPath), "DecompileCache", md5Hash);
+    }
+
+    /// <summary>
+    /// Get the decompiled text for a code entry
+    /// </summary>
+    /// <param name="codeEntry"></param>
+    /// <returns></returns>
+    public string GetDecompiledText (string codeEntry)
+    {
+        if (UseDecompileCache && File.Exists(Path.Combine(DecompileCachePath, codeEntry + ".gml")))
+        {
+            return File.ReadAllText(Path.Combine(DecompileCachePath, codeEntry + ".gml"));
+        }
+        else
+        {
+            string code = Decompiler.Decompile(Wrapper.Data.Code.ByName(codeEntry), Wrapper.DecompileContext.Value);
+            if (UseDecompileCache)
+            {
+                Directory.CreateDirectory(DecompileCachePath);
+                File.WriteAllText(Path.Combine(DecompileCachePath, codeEntry + ".gml"), code);
+            }
+            return code;
+        }
     }
 }

@@ -16,6 +16,8 @@ This is a list of every property and method and what they do. Abstract ones are 
 
 * `virtual string[] Symbols`: (optional) An array containing all symbols you want to define for preprocessing.
 
+* `virtual bool UseDecompileCache`: (default true) A boolean that should be true if caching the decompiled vanilla code for improved scripte execution is desired.
+
 * `abstract string[] GetCodeNames (string filePath)`: This is a method you must override. This function will be used to tell the loader what code entries you will replace with each file. The argument is the (relative) path of the file, and it should return an array containing all code entries it will replace
 
 ## Constructor
