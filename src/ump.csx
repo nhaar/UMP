@@ -269,79 +269,90 @@ abstract class UMPLoader
             entry.Import();
         }
 
+        // use this dictionary to group all patches together
+        // so that we can apply all the patches only decompiling the code once
+        Dictionary<string, UMPPatchFile> patchFiles = new();
+
         foreach (UMPCodeEntry entry in patches)
         {
-            UMPPatchFile patch = new UMPPatchFile(entry.Code, entry.Name, entry.IsASM, Wrapper, HelperDecompiler);
+            UMPPatchFile patch = new(entry.Code, entry.Name, entry.IsASM, Wrapper, HelperDecompiler);
+            if (patchFiles.ContainsKey(entry.Name))
+            {
+                patchFiles[entry.Name].Merge(patch);
+            }
+            else
+            {
+                patchFiles[entry.Name] = patch;
+            }
+        }
+
+        foreach (KeyValuePair<string, UMPPatchFile> entry in patchFiles)
+        {
+            UMPPatchFile patch = entry.Value;
             if (patch.RequiresCompilation)
             {
-                patch.AddCode(entry.Name);
-            }
+                patch.AddCode();
 
-            foreach (UMPPatchCommand command in patch.Commands)
-            {
-                if (command is UMPAfterCommand)
+                foreach (UMPPatchCommand command in patch.DecompileCommands)
                 {
-                    int placeIndex = patch.Code.IndexOf(command.OriginalCode) + command.OriginalCode.Length;
-                    patch.Code = patch.Code.Insert(placeIndex, "\n" + command.NewCode + "\n");
-                }
-                else if (command is UMPBeforeCommand)
-                {
-                    int placeIndex = patch.Code.IndexOf(command.OriginalCode);
-                    patch.Code = patch.Code.Insert(placeIndex, "\n" + command.NewCode + "\n");
-                }
-                else if (command is UMPReplaceCommand)
-                {
-                    if (command.OriginalCode == "")
+                    if (command is UMPAfterCommand)
                     {
-                        throw new UMPException("Error in patch file: Replace command requires code to be specified (empty string found)");
+                        int placeIndex = patch.Code.IndexOf(command.OriginalCode) + command.OriginalCode.Length;
+                        patch.Code = patch.Code.Insert(placeIndex, "\n" + command.NewCode + "\n");
                     }
-                    patch.Code = patch.Code.Replace(command.OriginalCode, command.NewCode);
-                }
-                else if (command is UMPAppendCommand)
-                {
-                    if (entry.IsASM)
+                    else if (command is UMPBeforeCommand)
                     {
+                        int placeIndex = patch.Code.IndexOf(command.OriginalCode);
+                        patch.Code = patch.Code.Insert(placeIndex, "\n" + command.NewCode + "\n");
+                    }
+                    else if (command is UMPReplaceCommand)
+                    {
+                        if (command.OriginalCode == "")
+                        {
+                            throw new UMPException("Error in patch file: Replace command requires code to be specified (empty string found)");
+                        }
+                        patch.Code = patch.Code.Replace(command.OriginalCode, command.NewCode);
+                    }
+                    else if (command is UMPAppendCommand)
+                    {
+                        // Note: can only be in ASM
                         patch.Code = patch.Code + "\n" + command.NewCode;
+                    }
+                    else if (command is UMPPrependCommand)
+                    {
+                        patch.Code = command.NewCode + "\n" + patch.Code;
                     }
                     else
                     {
-                        try
-                        {
-                            AppendGML(entry.Name, command.NewCode);
-                        }
-                        catch
-                        {
-                            throw new UMPException($"Error appending code to entry \"{entry.Name}\"");
-                        }
-                        if (patch.RequiresCompilation)
-                        {
-                            patch.AddCode(entry.Name);
-                        }
+                        throw new Exception("Unknown command type: " + command.GetType().Name);
                     }
                 }
-                else if (command is UMPPrependCommand)
-                {
-                    patch.Code = command.NewCode + "\n" + patch.Code;
-                }
-                else
-                {
-                    throw new Exception("Unknown command type: " + command.GetType().Name);
-                }
+
 
                 try
                 {
                     if (patch.IsASM)
                     {
-                        Wrapper.ImportASMString(entry.Name, patch.Code);
+                        Wrapper.ImportASMString(patch.CodeEntry, patch.Code);
                     }            
                     else if (patch.RequiresCompilation)
                     {
-                        Wrapper.Data.Code.ByName(entry.Name).ReplaceGML(patch.Code, Wrapper.Data);
+                        Wrapper.Data.Code.ByName(patch.CodeEntry).ReplaceGML(patch.Code, Wrapper.Data);
                     }
                 }
                 catch
                 {
-                    throw new UMPException($"Error patching code entry \"{entry.Name}\"");
+                    throw new UMPException($"Error patching code entry \"{patch.CodeEntry}\"");
+                }
+
+            }
+
+            // Do it later because these do not depend on the internal code of the code entry
+            foreach (UMPPatchCommand command in patch.NonDecompileCommands)
+            {
+                if (command is UMPAppendCommand)
+                {
+                    AppendGML(entry.Key, command.NewCode);
                 }
             }
         }
@@ -1244,10 +1255,16 @@ abstract class UMPPatchCommand
     /// </summary>
     public string NewCode { get; set; }
 
-    public UMPPatchCommand (string newCode, string originalCode = null)
+    /// <summary>
+    /// Whether the patch is for a disassembly text file or not
+    /// </summary>
+    public bool IsASM { get; set; }
+
+    public UMPPatchCommand (string newCode, string originalCode = null, bool isASM = false)
     {
         NewCode = newCode;
         OriginalCode = originalCode;
+        IsASM = isASM;
     }
 }
 
@@ -1256,7 +1273,7 @@ abstract class UMPPatchCommand
 /// </summary>
 class UMPAfterCommand : UMPPatchCommand
 {
-    public UMPAfterCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
+    public UMPAfterCommand (string newCode, string originalCode = null, bool isASM = false) : base(newCode, originalCode, isASM) { }
 
     public override bool BasedOnText => true;
 
@@ -1268,7 +1285,7 @@ class UMPAfterCommand : UMPPatchCommand
 /// </summary>
 class UMPBeforeCommand : UMPPatchCommand
 {
-    public UMPBeforeCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
+    public UMPBeforeCommand (string newCode, string originalCode = null, bool isASM = false) : base(newCode, originalCode, isASM) { }
 
     public override bool BasedOnText => true;
 
@@ -1280,7 +1297,7 @@ class UMPBeforeCommand : UMPPatchCommand
 /// </summary>
 class UMPReplaceCommand : UMPPatchCommand
 {
-    public UMPReplaceCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
+    public UMPReplaceCommand (string newCode, string originalCode = null, bool isASM = false) : base(newCode, originalCode, isASM) { }
 
     public override bool BasedOnText => true;
 
@@ -1293,11 +1310,12 @@ class UMPReplaceCommand : UMPPatchCommand
 /// </summary>
 class UMPAppendCommand : UMPPatchCommand
 {
-    public UMPAppendCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
+    public UMPAppendCommand (string newCode, string originalCode = null, bool isASM = false) : base(newCode, originalCode, isASM) { }
 
     public override bool BasedOnText => false;
 
-    public override bool RequiresCompilation => false;
+    // Assembly doesn't have a direct append method, but "decompilation" in this case means getting the assembly code
+    public override bool RequiresCompilation => IsASM;
 }
 
 /// <summary>
@@ -1305,7 +1323,7 @@ class UMPAppendCommand : UMPPatchCommand
 /// </summary>
 class UMPPrependCommand : UMPPatchCommand
 {
-    public UMPPrependCommand (string newCode, string originalCode = null) : base(newCode, originalCode) { }
+    public UMPPrependCommand (string newCode, string originalCode = null, bool isASM = false) : base(newCode, originalCode, isASM) { }
 
     public override bool BasedOnText => false;
 
@@ -1318,19 +1336,29 @@ class UMPPrependCommand : UMPPatchCommand
 class UMPPatchFile
 {
     /// <summary>
-    /// All commands in the patch
+    /// All commands in the patch that require modifying the decompiled code
     /// </summary>
-    public List<UMPPatchCommand> Commands = new();
+    public List<UMPPatchCommand> DecompileCommands = new();
+
+    /// <summary>
+    /// All commands in the patch that don't require modifying the decompiled code
+    /// </summary>
+    public List<UMPPatchCommand> NonDecompileCommands = new();
 
     /// <summary>
     /// Whether any of the patches require the code to be decompiled and then recompiled to create the changes
     /// </summary>
-    public bool RequiresCompilation { get; }
+    public bool RequiresCompilation => DecompileCommands.Count > 0;
 
     /// <summary>
     /// Code of the code entry that is being updated, expected to always be up to date with patch changes
     /// </summary>
     public string Code { get; set ; }
+
+    /// <summary>
+    /// Name of the code entry that is being updated
+    /// </summary>
+    public string CodeEntry { get; set; }
 
     /// <summary>
     /// Whether the patch is for a disassembly text file or not
@@ -1349,8 +1377,11 @@ class UMPPatchFile
         IsASM = isASM;
         Wrapper = wrapper;
         HelperDecompiler = decompiler;
+
+        // removes the first line (the /// PATCH line)
         gmlCode = gmlCode.Substring(gmlCode.IndexOf('\n') + 1);
         string[] patchLines = gmlCode.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None);
+        CodeEntry = entryName;
 
         Type currentCommand = null;
         List<string> originalCode = new();
@@ -1379,8 +1410,15 @@ class UMPPatchFile
                         inOriginalText = true;
                         string originalCodeString = string.Join("\n", originalCode);
                         string newCodeString = string.Join("\n", newCode);
-                        object command = Activator.CreateInstance(currentCommand, args: new object[] { newCodeString, originalCodeString });                                                        
-                        Commands.Add((UMPPatchCommand)command);
+                        object command = Activator.CreateInstance(currentCommand, args: new object[] { newCodeString, originalCodeString, IsASM });
+                        if (((UMPPatchCommand)command).RequiresCompilation)
+                        {
+                            DecompileCommands.Add((UMPPatchCommand)command);
+                        }
+                        else
+                        {
+                            NonDecompileCommands.Add((UMPPatchCommand)command);
+                        }
                         currentCommand = null;
                         newCode = new List<string>();
                         originalCode = new List<string>();
@@ -1435,35 +1473,45 @@ class UMPPatchFile
                 }
             }
         }
-
-        foreach (UMPPatchCommand command in Commands)
-        {
-            if (isASM || command.RequiresCompilation)
-            {
-                RequiresCompilation = true;
-                break;
-            }
-        }
     }
 
-    public void AddCode (string codeName)
+    /// <summary>
+    /// Decompiles the code or extracts the dissassembly text for the code entry being patched
+    /// </summary>
+    /// <exception cref="UMPException"></exception>
+    public void AddCode ()
     {
         try
         {
             if (IsASM)
             {
                 // necessary due to linebreak whitespace inconsistency
-                Code = Wrapper.GetDisassemblyText(codeName).Replace("\r", "");
+                Code = Wrapper.GetDisassemblyText(CodeEntry).Replace("\r", "");
             }
             else
             {
-                Code = HelperDecompiler.GetDecompiledText(codeName);
+                Code = HelperDecompiler.GetDecompiledText(CodeEntry);
             }
         }
         catch
         {
-            throw new UMPException($"Error decompiling code entry \"{codeName}\"");
+            throw new UMPException($"Error decompiling code entry \"{CodeEntry}\"");
         }
+    }
+
+    /// <summary>
+    /// Merge another patch file into this one
+    /// </summary>
+    /// <param name="other"></param>
+    public void Merge (UMPPatchFile other)
+    {
+        DecompileCommands.AddRange(other.DecompileCommands);
+        NonDecompileCommands.AddRange(other.NonDecompileCommands);
+    }
+
+    public override string ToString()
+    {
+        return $"{CodeEntry}.{(IsASM ? "asm" : "gml")}";
     }
 }
 
