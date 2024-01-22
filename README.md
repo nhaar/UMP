@@ -40,3 +40,9 @@ If your project already contains a base `.csx` script, then:
 # Guide/Tutorial
 
 See: [Guide on how to use the framework](https://github.com/nhaar/UMP/blob/main/guide/guide.md)
+
+# Mods that use UMP
+
+Unsure if UMP is good for you? Check examples of mods that use it and see if you like it.
+
+* [Keucher Mod - A speedrun practice mod for Deltarune](https://github.com/nhaar/keucher-mod)
