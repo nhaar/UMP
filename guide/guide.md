@@ -67,6 +67,16 @@ ExampleLoader loader = new ExampleLoader(UMP_WRAPPER, true);
 loader.Load();
 ```
 
+# The files
+
+All files need to end with either `.gml` or `.asm` to be recognized. `.gml` files represent gamemaker language files, and `.asm` represent files with the UTMT disassembly text. Both will work just fine with the rest in here, but beware of the following:
+
+**WARNING**
+
+If you are using `.asm` files, chances are you're doing that because the UTMT compiler can't properly compile some code. The way this framework works is that unless you are appending code to an entry, the entire entry will have to be recompiled, and as such, it may lead to errors that aren't even yours (this is an UTMT limitation). You can use `.asm` files to bypass this, but keep in mind that:
+
+* If you have both `.asm` files and `.gml` files for the same code entry, if you are doing anything but appending (see importing and patching code below), then your code will probably conflict and only one of those will work. So make sure there is no such interception
+
 # How to import code with UMP
 
 If you just drop normal GML files in your mod folder, you will notice you will get an error. This is because you need to specify in the first line of your code what the UMP type is. There are three UMP types:

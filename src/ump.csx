@@ -276,13 +276,19 @@ abstract class UMPLoader
         foreach (UMPCodeEntry entry in patches)
         {
             UMPPatchFile patch = new(entry.Code, entry.Name, entry.IsASM, Wrapper, HelperDecompiler);
-            if (patchFiles.ContainsKey(entry.Name))
+            // differentiating ASM and GML by a "file name" property
+            // what this means is that ASM and GML patches will be placed separatedly
+            // this means it will break if there is GML patch that requires compilation because the ASM one will
+            // possibly have changed it
+            // at the same time, there should be no reson for a GML patch to require compilation if there is an ASM patch
+            // because resorting to ASM usually means that the compiler is causing issues
+            if (patchFiles.ContainsKey(entry.FileName))
             {
-                patchFiles[entry.Name].Merge(patch);
+                patchFiles[entry.FileName].Merge(patch);
             }
             else
             {
-                patchFiles[entry.Name] = patch;
+                patchFiles[entry.FileName] = patch;
             }
         }
 
@@ -352,7 +358,7 @@ abstract class UMPLoader
             {
                 if (command is UMPAppendCommand)
                 {
-                    AppendGML(entry.Key, command.NewCode);
+                    AppendGML(patch.CodeEntry, command.NewCode);
                 }
             }
         }
@@ -1522,6 +1528,8 @@ public class UMPCodeEntry
 {
     public string Name { get; set; }
     public string Code { get; set; }
+
+    public string FileName => Name + (IsASM ? ".asm" : ".gml");
 
     public bool IsASM { get; set; }
 
