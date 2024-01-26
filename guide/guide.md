@@ -8,7 +8,7 @@ Once you have loaded the ump file, you will have access to the abstract class `U
 
 ## Loader properties and methods to override
 
-This is a list of every property and method and what they do. Abstract ones are mandatory, while virtual ones aren't and have a default value. Examples will be listed below!
+This is a list of every property and method and what they do. Abstract ones are mandatory, while virtual ones aren't and have a default value. Scroll down for examples if you aren't very familiar to C# and this looks a bit confusing!
 
 * `abstract string CodePath`: The path to your folder containing all your files, relative to your MAIN `.csx` script, which is the one that you tell UTMT to run,
 
@@ -16,7 +16,7 @@ This is a list of every property and method and what they do. Abstract ones are 
 
 * `virtual string[] Symbols`: (optional) An array containing all symbols you want to define for preprocessing.
 
-* `virtual bool UseDecompileCache`: (default true) A boolean that should be true if caching the decompiled vanilla code for improved scripte execution is desired.
+* `virtual bool UseDecompileCache`: (default true) A boolean that should be true if caching the decompiled vanilla code for improved script execution is desired.
 
 * `abstract string[] GetCodeNames (string filePath)`: This is a method you must override. This function will be used to tell the loader what code entries you will replace with each file. The argument is the (relative) path of the file, and it should return an array containing all code entries it will replace
 
