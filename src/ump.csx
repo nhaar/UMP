@@ -927,7 +927,7 @@ abstract class UMPLoader
                                 }
                                 case "else":
                                 {
-
+                                    SkipLine();
                                     State = State == ParseState.SkipBlock ? ParseState.AddBlock : ParseState.FinishedBlock;
                                     break;
                                 }
