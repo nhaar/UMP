@@ -718,8 +718,6 @@ abstract class UMPLoader
                         {
                             throw new UMPException("UMP Method not closed in code");
                         }
-                        Console.WriteLine("odd");
-                        Console.WriteLine(mainDigits + "." + decimalDigits);
 
                         methodArgs.Add(double.Parse(mainDigits + "." + decimalDigits, CultureInfo.InvariantCulture));
                         addedArg = true;
