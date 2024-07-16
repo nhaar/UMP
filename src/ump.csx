@@ -95,7 +95,7 @@ abstract class UMPLoader
 
         return enumValues;
     }
-
+    
     /// <summary>
     /// Loads all the code files with all the defined settings for the class
     /// </summary>
@@ -303,20 +303,23 @@ abstract class UMPLoader
                 {
                     if (command is UMPAfterCommand)
                     {
-                        int placeIndex = patch.Code.IndexOf(command.OriginalCode) + command.OriginalCode.Length;
+                        int startIndex = command.FindIndexOf(patch);
+                        int placeIndex = startIndex + command.OriginalCode.Length;
                         patch.Code = patch.Code.Insert(placeIndex, "\n" + command.NewCode + "\n");
                     }
                     else if (command is UMPBeforeCommand)
                     {
-                        int placeIndex = patch.Code.IndexOf(command.OriginalCode);
+                        int placeIndex = command.FindIndexOf(patch);
                         patch.Code = patch.Code.Insert(placeIndex, "\n" + command.NewCode + "\n");
                     }
                     else if (command is UMPReplaceCommand)
                     {
                         if (command.OriginalCode == "")
                         {
-                            throw new UMPException("Error in patch file: Replace command requires code to be specified (empty string found)");
+                            throw new UMPException($"Error in patch ({patch.CodeEntry}) file: Replace command requires code to be specified (empty string found)");
                         }
+                        // side effect running to see if there will be an error, the index won't be used per say
+                        command.FindIndexOf(patch);
                         patch.Code = patch.Code.Replace(command.OriginalCode, command.NewCode);
                     }
                     else if (command is UMPAppendCommand)
@@ -1240,6 +1243,11 @@ abstract class UMPLoader
 abstract class UMPPatchCommand
 {
     /// <summary>
+    /// Name of the command for debugging purposes
+    /// </summary>
+    public abstract string Command { get; }
+
+    /// <summary>
     /// Whether the command requires code from the original entry to be presented
     /// </summary>
     public abstract bool BasedOnText { get; }
@@ -1264,6 +1272,22 @@ abstract class UMPPatchCommand
     /// </summary>
     public bool IsASM { get; set; }
 
+    /// <summary>
+    /// Find the index that the "original code" of the command is found in a patch
+    /// </summary>
+    /// <param name="patch">Patch with the code entry to change</param>
+    /// <returns>The index where the original code starts</returns>
+    /// <exception cref="UMPException">An error, if could not find the original code in the entry</exception>
+    public int FindIndexOf(UMPPatchFile patch)
+    {
+        int startIndex = patch.Code.IndexOf(OriginalCode);
+        if (startIndex == -1)
+        {
+            throw new UMPException($"Could not find original code in {Command.ToUpper()} command for code entry: {patch.CodeEntry}. Original Code:\n" + OriginalCode);
+        }
+        return startIndex;
+    }
+
     public UMPPatchCommand (string newCode, string originalCode = null, bool isASM = false)
     {
         NewCode = newCode;
@@ -1277,6 +1301,8 @@ abstract class UMPPatchCommand
 /// </summary>
 class UMPAfterCommand : UMPPatchCommand
 {
+    public override string Command => "After";
+
     public UMPAfterCommand (string newCode, string originalCode = null, bool isASM = false) : base(newCode, originalCode, isASM) { }
 
     public override bool BasedOnText => true;
@@ -1289,6 +1315,8 @@ class UMPAfterCommand : UMPPatchCommand
 /// </summary>
 class UMPBeforeCommand : UMPPatchCommand
 {
+    public override string Command => "Before";
+
     public UMPBeforeCommand (string newCode, string originalCode = null, bool isASM = false) : base(newCode, originalCode, isASM) { }
 
     public override bool BasedOnText => true;
@@ -1301,6 +1329,8 @@ class UMPBeforeCommand : UMPPatchCommand
 /// </summary>
 class UMPReplaceCommand : UMPPatchCommand
 {
+    public override string Command => "Replace";
+
     public UMPReplaceCommand (string newCode, string originalCode = null, bool isASM = false) : base(newCode, originalCode, isASM) { }
 
     public override bool BasedOnText => true;
@@ -1314,6 +1344,8 @@ class UMPReplaceCommand : UMPPatchCommand
 /// </summary>
 class UMPAppendCommand : UMPPatchCommand
 {
+    public override string Command => "Append";
+
     public UMPAppendCommand (string newCode, string originalCode = null, bool isASM = false) : base(newCode, originalCode, isASM) { }
 
     public override bool BasedOnText => false;
@@ -1327,6 +1359,8 @@ class UMPAppendCommand : UMPPatchCommand
 /// </summary>
 class UMPPrependCommand : UMPPatchCommand
 {
+    public override string Command => "Prepend";
+
     public UMPPrependCommand (string newCode, string originalCode = null, bool isASM = false) : base(newCode, originalCode, isASM) { }
 
     public override bool BasedOnText => false;
