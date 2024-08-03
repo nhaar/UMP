@@ -46,3 +46,5 @@ See: [Guide on how to use the framework](https://github.com/nhaar/UMP/blob/main/
 Unsure if UMP is good for you? Check examples of mods that use it and see if you like it.
 
 * [Keucher Mod - A speedrun practice mod for Deltarune](https://github.com/nhaar/keucher-mod)
+
+* [Deltarune Romanian Translation Mod](https://github.com/ners-xd/DELTARUNE-RO)
