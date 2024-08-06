@@ -4,7 +4,7 @@ UMP is a framework for modding games using Undertale Mod Tool - It is quick to l
 
 # Warning!
 
-This framework doesn't work in the main verison of Undertale Mod Tool yet. You will need to use [this build of UTMT](https://github.com/krzys-h/UndertaleModTool/pull/1504) until the pull request is approved.
+This framework at the moment works only in the Bleeding Edge version of Undertale Mod Tool. Also, as new versions are released be careful with errors that may arise from decompilation differences.
 
 # About
 
@@ -46,3 +46,5 @@ See: [Guide on how to use the framework](https://github.com/nhaar/UMP/blob/main/
 Unsure if UMP is good for you? Check examples of mods that use it and see if you like it.
 
 * [Keucher Mod - A speedrun practice mod for Deltarune](https://github.com/nhaar/keucher-mod)
+
+* [Deltarune Romanian Translation Mod](https://github.com/ners-xd/DELTARUNE-RO)
