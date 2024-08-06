@@ -16,7 +16,7 @@ This is a list of every property and method and what they do. Abstract ones are 
 
 * `virtual string[] Symbols`: (optional) An array containing all symbols you want to define for preprocessing.
 
-* `virtual bool UseDecompileCache`: (default true) A boolean that should be true if caching the decompiled vanilla code for improved script execution is desired.
+* `virtual bool UseDecompileCache`: (default false) A boolean that should be true if caching the decompiled vanilla code for improved script execution is desired. WARNING: You may want to delete the cache if you ever change your version of UMT to make sure that your code will work with everyone else and not just the specific version you are using.
 
 * `abstract string[] GetCodeNames (string filePath)`: This is a method you must override. This function will be used to tell the loader what code entries you will replace with each file. The argument is the (relative) path of the file, and it should return an array containing all code entries it will replace
 
@@ -168,6 +168,8 @@ global.debug = true
 ```
 
 If a file like this is included, then it will patch the code entry it is named after. Note that this syntax can't work with newly created files, only with code entries that already exist in the game.
+
+Note that when you are using a PATCH that searches for specific code, you are looking for the code that a specific version of Undertale Mod Tool is decompiling. In general, it should not change much as new versions come out, but it is possible that it will change. Beware of eventual exceptions that will show up due to a UMT version difference.
 
 Note that all whitespace between the `///` of each line is considered. The first text requires everything included to be matched, so do not include unecessary whitespace, or, in multilines cases, you will need to provide the exact whitespace, for example, if the part you want to replace has indentation:
 

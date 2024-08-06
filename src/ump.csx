@@ -42,7 +42,7 @@ abstract class UMPLoader
     /// </summary>
     public virtual string[] Symbols { get; } = null;
 
-    public virtual bool UseDecompileCache { get; } = true;
+    public virtual bool UseDecompileCache { get; } = false;
 
     public UMPDecompiler HelperDecompiler;
 
