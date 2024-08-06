@@ -351,7 +351,7 @@ abstract class UMPLoader
                 }
                 catch
                 {
-                    throw new UMPException($"Error patching code entry \"{patch.CodeEntry}\"");
+                    throw new UMPException($"Error patching code entry \"{patch.CodeEntry}\". There is likely wrong GML syntax:\n{patch.Code}");
                 }
 
             }
@@ -1506,7 +1506,7 @@ class UMPPatchFile
                     }
                     else
                     {
-                        Console.WriteLine($"WARNING: Unknown command ({line}) in patch file: {entryName}");
+                        throw new UMPException($"Unknown command ({line}) in patch file: {entryName}");
                     }
                 }
             }
@@ -1533,7 +1533,7 @@ class UMPPatchFile
         }
         catch
         {
-            throw new UMPException($"Error decompiling code entry \"{CodeEntry}\"");
+            throw new UMPException($"Error decompiling code entry \"{CodeEntry}\". Most likely the code entry was not found");
         }
     }
 
