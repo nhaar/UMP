@@ -1280,9 +1280,27 @@ abstract class UMPPatchCommand
     public int FindIndexOf(UMPPatchFile patch)
     {
         int startIndex = patch.Code.IndexOf(OriginalCode);
+
+        // use to count all instances of original code
+        int count = 0;
+        if (startIndex != -1)
+        {
+            int index = startIndex;
+            do
+            {
+                count++;
+                index += OriginalCode.Length;
+            }
+            while ((index = patch.Code.IndexOf(OriginalCode, index)) != -1);
+        }
+
         if (startIndex == -1)
         {
             throw new UMPException($"Could not find original code in {Command.ToUpper()} command for code entry: {patch.CodeEntry}. Original Code:\n" + OriginalCode);
+        }
+        else if (count > 1)
+        {
+            throw new UMPException($"More than one matching original code has been found in {Command.ToUpper()} command for code entry: {patch.CodeEntry}. Original Code:\n{OriginalCode}");
         }
         return startIndex;
     }

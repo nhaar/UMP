@@ -171,6 +171,8 @@ If a file like this is included, then it will patch the code entry it is named a
 
 Note that when you are using a PATCH that searches for specific code, you are looking for the code that a specific version of Undertale Mod Tool is decompiling. In general, it should not change much as new versions come out, but it is possible that it will change. Beware of eventual exceptions that will show up due to a UMT version difference.
 
+UMP will raise an error if it cannot find the code you have given, in an attempt to warn you of a possible decompilation issue. It will also raise an error if the code find more than one code that matches the given pattern, since it is most likely not unintended to match more than once. If you want to match multiple similar things, you will need to make sure you explicit where exactly that is by supplying "neighbors".
+
 Note that all whitespace between the `///` of each line is considered. The first text requires everything included to be matched, so do not include unecessary whitespace, or, in multilines cases, you will need to provide the exact whitespace, for example, if the part you want to replace has indentation:
 
 ```gml
