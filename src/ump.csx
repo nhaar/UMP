@@ -1384,6 +1384,11 @@ abstract class UMPPatchCommand
     /// <exception cref="UMPException">An error, if could not find the original code in the entry</exception>
     public int FindIndexOf(UMPPatchFile patch)
     {
+        // Catch empty "AFTER", "BEFORE" etc...
+        if (OriginalCode.Length == 0)
+        {
+            throw new UMPException($"Command {Command} found with EMPTY code in entry {patch.CodeEntry}");
+        }
         int startIndex = patch.Code.IndexOf(OriginalCode);
 
         // use to count all instances of original code
