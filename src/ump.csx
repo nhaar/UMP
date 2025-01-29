@@ -388,19 +388,121 @@ abstract class UMPLoader
             return false;
         }
 
-        string ifPattern = @"(?<=^///.*?\.ignore\s+if\s+)[\d\w_]+";
-        string ifndefPattern = ifPattern.Replace("if", "ifndef");
-        string positiveCondition = Regex.Match(code, ifPattern).Value;
-        string negativeCondition = Regex.Match(code, ifndefPattern).Value;
+        string ifPattern = @"(?<=^///.*?\.ignore\s+if\s+).*(?=\n)";
+        var matchPattern = Regex.Match(code, ifPattern);
 
-        if (positiveCondition == negativeCondition && negativeCondition == "")
+        if (!matchPattern.Success)
         {
             throw new UMPException($"Invalid \"ignore\" statement in file: {file}");
         }
 
-        // ignore if the condition is met (based on the symbol)
-        bool isPositiveCondition = positiveCondition != "";
-        return CodeProcessor.MetPreprocessingCondition(isPositiveCondition, isPositiveCondition ? positiveCondition : negativeCondition, Symbols);
+        string condition = matchPattern.Value;
+
+        SymbolConditionParser parser = new(condition, Symbols);
+
+        return parser.Parse();
+    }
+
+    /// <summary>
+    /// Class which handles a symbol boolean expression (eg. "!DEBUG || !OLD"), and given the symbols, parses it to find its boolean value
+    /// </summary>
+    public class SymbolConditionParser
+    {
+        private readonly string _expression;
+        private int _position;
+        private string[] _symbols;
+
+        public SymbolConditionParser(string expression, string[] symbols)
+        {
+            // full trimming
+            _expression = expression.Replace(" ", "").Trim();;
+            _symbols = symbols;
+            _position = 0;
+        }
+
+        public bool Parse()
+        {
+            // start parsing from the highest precedence
+            bool result = ParseOr();
+            if (_position < _expression.Length)
+            {
+                throw new UMPException($"Unexpected character at position {_position}: {_expression[_position]}");
+            }
+
+            return result;
+        }
+
+        private bool ParseOr()
+        {
+            bool left = ParseAnd();
+            while (Match("||"))
+            {
+                bool right = ParseAnd();
+                left = left || right;
+            }
+            return left;
+        }
+
+        private bool ParseAnd()
+        {
+            bool left = ParseUnary();
+            while (Match("&&"))
+            {
+                bool right = ParseUnary();
+                left = left && right;
+            }
+            return left;
+        }
+
+        private bool ParseUnary()
+        {
+            if (Match("!"))
+            {
+                return !ParseUnary();
+            }
+            return ParsePrimary();
+        }
+
+        private bool ParsePrimary()
+        {
+            if (Match("("))
+            {
+                bool result = ParseOr();
+                if (!Match(")"))
+                {
+                    throw new UMPException($"Expected closing parenthesis at position {_position}");
+                }
+                return result;
+            }
+
+            var symbol = ParseSymbol();
+            return _symbols.Contains(symbol);
+        }
+
+        private string ParseSymbol()
+        {
+            var exprSubstring = _expression.Substring(_position);
+            var symbolMatch = Regex.Match(exprSubstring, @"^[\w\d_]+");
+            if (symbolMatch.Success)
+            {
+                _position += symbolMatch.Value.Length;
+                return symbolMatch.Value;
+            }
+            else
+            {
+                throw new UMPException("Unknown symbol in expression " + exprSubstring);
+            }
+        }
+
+        private bool Match(string token)
+        {
+            if (_expression.Substring(_position).StartsWith(token))
+            {
+                _position += token.Length;
+                return true;
+            }
+            return false;
+        }
     }
 
     /// <summary>
@@ -557,6 +659,22 @@ abstract class UMPLoader
         }
 
         /// <summary>
+        /// Skip the current line and returns what was left in it
+        /// </summary>
+        /// <returns></returns>
+        public string SkipAndGetLineAhead ()
+        {
+            var content = "";
+            while (Inbounds && CurrentChar != '\n')
+            {
+                content += CurrentChar;
+                Skip();
+            }
+            Skip();
+            return content;
+        }
+
+        /// <summary>
         /// Skip the upcoming word and return it
         /// </summary>
         /// <returns></returns>
@@ -577,21 +695,16 @@ abstract class UMPLoader
         public string ProcessedCode { get; set; }
 
         /// <summary>
-        /// Process the start of an #if block
+        /// Process the condition of an #if block
         /// </summary>
-        /// <param name="isPositiveCondition">Should be true if the condition in the #if statement being met should add the block and false if it should skip</param>
         /// <exception cref="UMPException"></exception>
-        public void ProcessIfBlock (bool isPositiveCondition)
+        public void ProcessIfBlock ()
         {
             SkipWhitespace();
-            string symbol = SkipWordAhead();
-            if (symbol == "")
-            {
-                throw new UMPException("No symbol found after if keyword");
-            }
-            SkipLine();
-            bool condition = MetPreprocessingCondition(isPositiveCondition, symbol);
-            State = condition ? ParseState.AddBlock : ParseState.SkipBlock;
+            string condition = SkipAndGetLineAhead();
+            SymbolConditionParser parser = new(condition, Symbols);
+            bool result = parser.Parse();
+            State = result ? ParseState.AddBlock : ParseState.SkipBlock;
         }
 
         /// <summary>
@@ -812,32 +925,6 @@ abstract class UMPLoader
             FinishedBlock
         }
 
-        /// <summary>
-        /// Whether a preprocessing condition is met or not (it's based on a symbol)
-        /// </summary>
-        /// <param name="isPositiveCondition">If is positive, then the symbol needs to be defined, if not, then it needs to not be defined</param>
-        /// <param name="symbol">The symbol to test</param>
-        /// <param name="symbols">The defined symbols</param>
-        /// <returns></returns>
-        public static bool MetPreprocessingCondition (bool isPositiveCondition, string symbol, string[] symbols)
-        {
-            return
-            (
-                (isPositiveCondition && symbols?.Contains(symbol) == true) ||
-                (!isPositiveCondition && symbols?.Contains(symbol) != true)
-            );
-        }
-
-        /// <summary>
-        /// Whether a preprocessing condition is met or not (based on the instance's symbols)
-        /// </summary>
-        /// <param name="isPositiveCondition">If is positive, then the symbol needs to be defined, if not, then it needs to not be defined</param>
-        /// <param name="symbol">The symbol to test</param>
-        /// <returns></returns>
-        public bool MetPreprocessingCondition (bool isPositiveCondition, string symbol)
-        {
-            return MetPreprocessingCondition(isPositiveCondition, symbol, Symbols);
-        }
 
         /// <summary>
         /// If the parser is in a #if block that should be skipped
@@ -898,12 +985,12 @@ abstract class UMPLoader
                         Skip(1);
                         string word = ReadWordAhead();
 
-                        if (State == ParseState.Normal && Regex.IsMatch(word, @"(if|ifndef)"))
+                        if (State == ParseState.Normal && word == "if")
                         {
                             Skip(word.Length);
-                            ProcessIfBlock(word == "if");
+                            ProcessIfBlock();
                         }
-                        else if (State != ParseState.Normal && Regex.IsMatch(word, @"(endif|elsif|elsifndef|else)"))
+                        else if (State != ParseState.Normal && Regex.IsMatch(word, @"(endif|elsif|else)"))
                         {
                             Skip(word.Length);
                             switch (word)
@@ -915,20 +1002,23 @@ abstract class UMPLoader
                                     break;
                                 }
                                 case "elsif":
-                                case "elsifndef":
                                 {
                                     if (State == ParseState.AddBlock)
                                     {
                                         State = ParseState.FinishedBlock;
                                     }
+                                    else if (State == ParseState.FinishedBlock)
+                                    {
+                                        SkipLine();
+                                    }
                                     else if (State == ParseState.SkipBlock)
                                     {
-                                        ProcessIfBlock(word == "elsif");
+                                        ProcessIfBlock();
                                     }
                                     else
                                     {
                                         // this should never happen
-                                        throw new UMPException("Invalid elsif in code");
+                                        throw new UMPException($"Invalid elsif in code, current state: {State}");
                                     }
                                     break;
                                 }

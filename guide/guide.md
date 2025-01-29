@@ -308,12 +308,22 @@ line3 = 3
 
 In preprocessing, you can choose what part of your code will get used or not depending on your symbols. A symbol is just a word that can be defined or not. You can define them in your symbols array in `UMPLoader`.
 
+## Symbol Boolean Expressions
+
+You can write boolean expressions using symbols, which are used for IGNORING and for preprocessing (see below for more information). The syntax is basically the same as the one used in GameMakerLanguage. For example,
+
+```
+(!DEBUG && SYMBOL1) || SYMBOL2 
+```
+
+It will be evaluated to either TRUE or FALSE depending on the symbols. The symbols are treated as TRUE if they are defined and FALSE otherwise
+
 ## Ignoring Files
 
-You can ignore files with your symbols. In the first line, after the file type, you can include `.ignore if SYMBOL` to ignore the file if the symbol is defined, or `.ignore ifndef SYMBOL` ot ignore the file if the symbol is not defined. For example
+You can ignore files with your symbols. In the first line, after the file type, you can include `.ignore if EXPRESSION` to ignore the file if the symbol is defined. The expression should follow the format defined above. For example:
 
 ```gml
-/// FUNCTIONS .ignore ifndef DEBUG
+/// FUNCTIONS .ignore if !DEBUG
 
 function some_debug_function()
 {
@@ -323,7 +333,7 @@ function some_debug_function()
 
 ## Selectively including code
 
-You can remove or include parts of code depending on your symbols using if-else statements with the symbols. You can do so by using "#" followed by the keywords "if", "ifndef", "elsif", "elsifndef", "else" and "endif". To start such block, you begin by writing either "#if" or "#ifndef", followed by a symbol. Then, everything after that (including everything in the same line) will be ERASED if the condition is not met, up until the "#endif" statement. Likewise, you can chain it using else statements, with other symbols with "#elsif" and "#elseifndef" or with no symbol using "#else". Here's an example
+You can remove or include parts of code depending on your symbols using if-else statements with the symbols. You can do so by using "#" followed by the keywords "if", "elsif", "else" and "endif". To start such block, you begin by writing either "#if", followed by a symbol boolean expression. Then, everything after that (including everything in the same line) will be ERASED if the condition is not met, up until the "#endif" statement. Likewise, you can chain it using else statements, with other expressions with "#elsif" or with no boolean condition using "#else". Here's an example
 
 ```gml
 /// FUNCTIONS
@@ -340,7 +350,7 @@ function is_debug()
 }
 ```
 
-If the DEBUG symbol is defined, it will return true, else if the PRODUCTION symbol is defined, it will return false. If neither are defined, it will return something else. Using "ifndef" would equate eto the symbol not being defined.
+If the DEBUG symbol is defined, it will return true, else if the PRODUCTION symbol is defined, it will return false. If neither are defined, it will return something else.
 
 # Enums
 
