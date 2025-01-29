@@ -136,7 +136,15 @@ abstract class UMPLoader
             }
 
             UMPLoader.CodeProcessor processor = new(code, this);
-            string processedCode = processor.Preprocess();
+            string processedCode;
+            try
+            {
+                processedCode = processor.Preprocess();
+            }
+            catch (Exception ex)
+            {
+                throw new UMPException($"Error processing file {file}, {ex.Message}\n{ex.StackTrace}");
+            }
 
             string relativePath = Path.GetRelativePath(absoluteCodePath, file);
             processedFiles[relativePath] = processedCode;
