@@ -1330,7 +1330,14 @@ abstract class UMPLoader
     /// <param name="code"></param>
     public void AppendGML (string codeName, string code)
     {
+        try
+        {
         Wrapper.Data.Code.ByName(codeName).AppendGML(code, Wrapper.Data);
+        }
+        catch
+        {
+            throw new UMPException($"Error appending in file (Likely code doesn't exist) {codeName}");
+        }
     }
 }
 
