@@ -48,3 +48,5 @@ Unsure if UMP is good for you? Check examples of mods that use it and see if you
 * [Keucher Mod - A speedrun practice mod for Deltarune](https://github.com/nhaar/keucher-mod)
 
 * [Deltarune Romanian Translation Mod](https://github.com/ners-xd/DELTARUNE-RO)
+
+* [Deltarune Byngosynch Mod](https://github.com/ners-xd/deltarune-bingosync)
