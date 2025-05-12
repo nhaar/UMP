@@ -5,7 +5,10 @@ using System.Linq;
 using System.Globalization;
 using System.Security.Cryptography;
 
-ThreadLocal<GlobalDecompileContext> UMP_DECOMPILE_CONTEXT = new ThreadLocal<GlobalDecompileContext>(() => new GlobalDecompileContext(Data, false));
+EnsureDataLoaded();
+
+GlobalDecompileContext UMP_DECOMPILE_CONTEXT = new(Data);
+Underanalyzer.Decompiler.IDecompileSettings decompileSettings = Data.ToolInfo.DecompilerSettings;
 
 /// <summary>
 /// Wrapper for the IScriptInterface methods
@@ -15,10 +18,9 @@ UMPWrapper UMP_WRAPPER = new UMPWrapper
     Data,
     ScriptPath,
     FilePath,
-    (string name, string code) => { ImportGMLString(name, code); return ""; },
-    (string name, string code) => { ImportASMString(name, code); return ""; },
     (string name) => GetDisassemblyText(name),
-    UMP_DECOMPILE_CONTEXT
+    UMP_DECOMPILE_CONTEXT,
+    decompileSettings
 );
 
 /// <summary>
@@ -260,14 +262,9 @@ abstract class UMPLoader
                 }
                 string scriptName = entry.FunctionName;
                 string codeName = entry.Name.Replace("gml_GlobalScript", "gml_Script");
-                if (Wrapper.Data.Scripts.ByName(scriptName) == null)
-                {
-                    Wrapper.ImportGMLString(codeName, functionBody);
-                }
-                else
-                {
-                    Wrapper.Data.Code.ByName(codeName).ReplaceGML(functionBody, Wrapper.Data);
-                }
+                UndertaleModLib.Compiler.CodeImportGroup localImportGroup = new(Wrapper.Data);
+                localImportGroup.QueueReplace(codeName, functionBody);
+                localImportGroup.Import();
             }
         }
 
@@ -347,14 +344,9 @@ abstract class UMPLoader
 
                 try
                 {
-                    if (patch.IsASM)
-                    {
-                        Wrapper.ImportASMString(patch.CodeEntry, patch.Code);
-                    }            
-                    else if (patch.RequiresCompilation)
-                    {
-                        Wrapper.Data.Code.ByName(patch.CodeEntry).ReplaceGML(patch.Code, Wrapper.Data);
-                    }
+                    UndertaleModLib.Compiler.CodeImportGroup localImportGroup = new(Wrapper.Data);
+                    localImportGroup.QueueReplace(patch.CodeEntry, patch.Code);
+                    localImportGroup.Import();
                 }
                 catch
                 {
@@ -368,7 +360,9 @@ abstract class UMPLoader
             {
                 if (command is UMPAppendCommand)
                 {
-                    AppendGML(patch.CodeEntry, command.NewCode);
+                    UndertaleModLib.Compiler.CodeImportGroup localImportGroup = new(Wrapper.Data);
+                    localImportGroup.QueueAppend(patch.CodeEntry, command.NewCode);
+                    localImportGroup.Import();
                 }
             }
         }
@@ -1332,7 +1326,9 @@ abstract class UMPLoader
     {
         try
         {
-            Wrapper.Data.Code.ByName(codeName).AppendGML(code, Wrapper.Data);
+            UndertaleModLib.Compiler.CodeImportGroup localImportGroup = new(Wrapper.Data);
+            localImportGroup.QueueAppend(codeName, code);
+            localImportGroup.Import();
         }
         catch
         {
@@ -1722,14 +1718,9 @@ public class UMPCodeEntry
 
     public void Import ()
     {
-        if (IsASM)
-        {
-            Wrapper.ImportASMString(Name, Code);
-        }
-        else
-        {
-            Wrapper.ImportGMLString(Name, Code);
-        }
+        UndertaleModLib.Compiler.CodeImportGroup localImportGroup = new(Wrapper.Data);
+        localImportGroup.QueueReplace(Name, Code);
+        localImportGroup.Import();
     }
 }
 
@@ -1761,37 +1752,33 @@ public class UMPWrapper
 
     public string DataPath;
 
-    public Func<string, string, string> ImportGMLString;
-
-    public Func<string, string, string> ImportASMString;
-
     public Func<string, string> GetDisassemblyText;
 
     public Func<string, string> GetDecompiledText;
 
-    public ThreadLocal<GlobalDecompileContext> DecompileContext;
+    public GlobalDecompileContext DecompileContext;
+
+    public Underanalyzer.Decompiler.IDecompileSettings DecompileSettings;
 
     public UMPWrapper
     (
         UndertaleData data,
         string scriptPath,
         string dataPath,
-        Func<string, string, string> importGMLString,
-        Func<string, string, string> importASMString,
         Func<string, string> getDisassemblyText,
-        ThreadLocal<GlobalDecompileContext> decompileContext
+        GlobalDecompileContext decompileContext,
+        Underanalyzer.Decompiler.IDecompileSettings decompileSettings
     )
     {
         Data = data;
         ScriptPath = scriptPath;
         DataPath = dataPath;
-        ImportGMLString = importGMLString;
-        ImportASMString = importASMString;
         GetDisassemblyText = getDisassemblyText;
         DecompileContext = decompileContext;
-        if (Data.KnownSubFunctions is null)
+        DecompileSettings = decompileSettings;
+        if (Data.GlobalFunctions is null)
         {
-            Decompiler.BuildSubFunctionCache(Data);
+            GlobalDecompileContext.BuildGlobalFunctionCache(Data);
         }
     }
 }
@@ -1847,7 +1834,8 @@ class UMPDecompiler
         }
         else
         {
-            string code = Decompiler.Decompile(Wrapper.Data.Code.ByName(codeEntry), Wrapper.DecompileContext.Value);
+            string code = new Underanalyzer.Decompiler.DecompileContext(Wrapper.DecompileContext, Wrapper.Data.Code.ByName(codeEntry), Wrapper.DecompileSettings).DecompileToString();
+
             if (UseDecompileCache)
             {
                 Directory.CreateDirectory(DecompileCachePath);
