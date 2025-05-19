@@ -318,6 +318,26 @@ You can write boolean expressions using symbols, which are used for IGNORING and
 
 It will be evaluated to either TRUE or FALSE depending on the symbols. The symbols are treated as TRUE if they are defined and FALSE otherwise
 
+## Selectively including files based on name
+
+You can add custom code which will be able to filter which code you would like to include base on its file name. All you need to do is create an implementation of the `AcceptFile` function in your loader. Here is an example:
+
+```cs
+// CUSTOM variable to track the state of the "chapter"
+public bool IsChapter1 { get; set; }
+
+// custom implementation of the function
+public virtual bool AcceptFile(string filePath)
+{
+    if (IsChapter1)
+    {
+        return filePath.startsWith('chapter1');
+    }
+}
+```
+
+As seen above, the function takes the file path (relative to the mod directory) as the argument, and you must return `true` if the file should be accepted, and `false` otherwise. By default, it always returns `true`
+
 ## Ignoring Files
 
 You can ignore files with your symbols. In the first line, after the file type, you can include `.ignore if EXPRESSION` to ignore the file if the symbol is defined. The expression should follow the format defined above. For example:
