@@ -49,4 +49,4 @@ Unsure if UMP is good for you? Check examples of mods that use it and see if you
 
 * [Deltarune Romanian Translation Mod](https://github.com/ners-xd/DELTARUNE-RO)
 
-* [Deltarune Byngosync Mod](https://github.com/ners-xd/deltarune-bingosync)
+* [Deltarune Bingosync Mod](https://github.com/ners-xd/deltarune-bingosync)
