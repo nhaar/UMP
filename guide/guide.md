@@ -331,7 +331,7 @@ public virtual bool AcceptFile(string filePath)
 {
     if (IsChapter1)
     {
-        return filePath.startsWith('chapter1');
+        return filePath.StartsWith('chapter1');
     }
 }
 ```

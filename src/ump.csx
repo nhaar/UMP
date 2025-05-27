@@ -141,7 +141,8 @@ abstract class UMPLoader
         // preprocessing code (everything using #)
         foreach (string file in files)
         {
-            if (!AcceptFile(file))
+            string relativePath = Path.GetRelativePath(absoluteCodePath, file);
+            if (!AcceptFile(relativePath))
             {
                 continue;
             }
@@ -163,7 +164,6 @@ abstract class UMPLoader
                 throw new UMPException($"Error processing file {file}, {ex.Message}\n{ex.StackTrace}");
             }
 
-            string relativePath = Path.GetRelativePath(absoluteCodePath, file);
             processedFiles[relativePath] = processedCode;
         }
 
