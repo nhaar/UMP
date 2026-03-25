@@ -2,9 +2,9 @@
 
 UMP is a framework for modding games using Undertale Mod Tool - It is quick to learn (contains only a small guide) and has useful resources for maintaining mods with a decently large code base.
 
-# Warning!
+# Warning
 
-This framework at the moment works only in the Bleeding Edge version of Undertale Mod Tool. Also, as new versions are released be careful with errors that may arise from decompilation differences.
+Make sure to keep your UTMT up-to-date. Errors may arise from an older UTMT version.
 
 # About
 
@@ -13,20 +13,18 @@ It focuses around being able to better organize your gamemaker (and assembly) co
 
 * You can organize all your code as external `.gml` files in a single folder, with any subdirectory organization, and it will link all subdirectories.
 
+* Allows for using PATCH files which will only change parts of a code entry, reducing unused code and making the patches more version resistent
+
 * You can configurate what code entries each file will affect depending on the file name. The standard use case for this is
 for example making a file named `obj_OBJECT_NAME_Step_0.gml` map to a code entry `gml_Object_OBJECT_NAME_Step_0.gml`; you are free to customize it to your project
 
 * Automatically create new objects, if code for such an object is detected, and organizes new functions so that they are always defined in a proper order
 
-* Allows to easily create custom functions, allowing you to define multiple functions in one file
+* Allows to easily create custom functions, allowing you to define multiple functions (For GMS 2.3+, this is possible in UTMT normally, but the support also extends older versions)
 
-* Allows for using PATCH files which will only change parts of a code entry, reducing unused code and making the patches more version resistent
+* Contains pre-processing which can be very useful for mods that need to work with different versions. Includes being able to selectively remove or include files depending on pre-defined symbols.
 
-* Allows using enums in UTMT (syntax isn't the same as in normal GML, check guide)
-
-* Allows using inline C# methods to generate GML, which work by defining them in the C# part of the script and calling them in GML
-
-* Allows for code preprocessing using symbols
+* Allows using inline C# methods to generate GML (at compile time), which work by defining them in the C# part of the script and calling them in GML
 
 # Installation tutorial
 
