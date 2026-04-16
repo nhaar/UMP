@@ -463,3 +463,15 @@ will be compiled as
 case (2.4):
     show_debug_message("hello world!")
 ```
+
+# Escaping the preprocessing commands
+
+Because UMP uses `#` to write preprocessing commands, if your code uses it as part of GML, you will run into an issue. The way to bypass this is to escape the character by using an additional `#`. For example, the code:
+
+`color = #FFFFFF`
+
+Should be instead written as
+
+`color = ##FFFFFF`
+
+UMP will ignore the extra `#`, and the code will be considered with only one #. This is useful both for adding or for modifying code.
