@@ -372,6 +372,23 @@ function is_debug()
 
 If the DEBUG symbol is defined, it will return true, else if the PRODUCTION symbol is defined, it will return false. If neither are defined, it will return something else.
 
+### Nesting #if statements
+
+It is also possible to nest the #if statements:
+
+```
+#if A
+var a = 1;
+    #if B
+    var b = 1;
+    #endif
+#endif
+```
+
+In this case, if A is defined, `var a = 1;` will be added, but `var b = 1;` will depend on B being defined.
+
+WARNING: The whitespace that precedes #if is NEVER erased. This might break code that needs to be matched, in that case it is wise to write every # statement at the beginning of the line.
+
 # Enums
 
 Enums are part of the current verison of GML, but not supported in UTMT. An implementation of enums can be used with UMP files, but not using the same syntax of enums as in standard GML. To create custom enums, you will want to include inside your `UMPLoader` implementation declarations of enums. For example
